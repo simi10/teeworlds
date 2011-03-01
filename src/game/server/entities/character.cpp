@@ -54,7 +54,6 @@ void CCharacter::Reset()
 
 bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 {
-	m_PlayerState = PLAYERSTATE_UNKNOWN;
 	m_EmoteStop = -1;
 	m_LastAction = -1;
 	m_ActiveWeapon = WEAPON_GRENADE;
@@ -823,5 +822,5 @@ void CCharacter::Snap(int SnappingClient)
 			pCharacter->m_Emote = EMOTE_BLINK;
 	}
 
-	pCharacter->m_PlayerState = m_PlayerState;
+	pCharacter->m_PlayerFlags = GetPlayer()->m_PlayerFlags;
 }
