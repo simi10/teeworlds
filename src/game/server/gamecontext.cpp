@@ -952,7 +952,6 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		
 		pPlayer->m_LastKill = Server()->Tick();
 		pPlayer->KillCharacter(WEAPON_SELF);
-		pPlayer->m_RespawnTick = Server()->Tick()+Server()->TickSpeed()*3;
 	}
 }
 
