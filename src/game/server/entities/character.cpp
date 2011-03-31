@@ -564,8 +564,6 @@ void CCharacter::Tick()
 	// handle kill counter
 	if(m_Kills > 0 && m_LastKill + Server()->TickSpeed()*2 < Server()->Tick())
 		m_Kills = 0;
-	
-	m_PlayerState = m_Input.m_PlayerState;
 
 	// Previnput
 	m_PrevInput = m_Input;
