@@ -1,9 +1,11 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <engine/shared/config.h>
-#include <game/generated/protocol.h>
+
 #include <game/server/gamecontext.h>
 #include <game/server/gamemodes/fly.h>
+
+#include "character.h"
 #include "projectile.h"
 
 CProjectile::CProjectile(CGameWorld *pGameWorld, int Type, int Owner, vec2 Pos, vec2 Dir, int Span,
@@ -56,7 +58,6 @@ vec2 CProjectile::GetPos(float Time)
 	return CalcPos(m_Pos, m_Direction, Curvature, Speed, Time);
 }
 
-
 void CProjectile::Tick()
 {
 	float Pt = (Server()->Tick()-m_StartTick-1)/(float)Server()->TickSpeed();
@@ -87,7 +88,7 @@ void CProjectile::Tick()
 	int z = GameServer()->Collision()->IsTeleport(GameServer()->Collision()->GetIndex(PrevPos, CurPos));
   	if(g_Config.m_SvTeleport && z && g_Config.m_SvTeleportGrenade && m_Weapon == WEAPON_GRENADE)
   	{
- 		m_Pos = ((CGameControllerFLY*)GameServer()->m_pController)->m_pTeleporter[z-1];
+ 		m_Pos = ((CGameControllerFLY*)GameServer()->m_pController)->GetTeleporter(z-1);
   		m_StartTick = Server()->Tick();
 	}
 }

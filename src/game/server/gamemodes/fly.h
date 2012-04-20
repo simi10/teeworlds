@@ -4,22 +4,30 @@
 
 class CGameControllerFLY : public IGameController
 {
-public:
-	class CFlag *m_apFlags[2];
-	
-	vec2 *m_pTeleporter;
+	// balancing
+	virtual bool CanBeMovedOnBalance(int ClientID);
 
-	CGameControllerFLY(class CGameContext *pGameServer);
-	
+	// game
+	vec2 *m_pTeleporter;
+	class CFlag *m_apFlags[2];
+
+	virtual void DoWincheckMatch();
+
+	// general
 	void InitTeleporter();
 
-	virtual void DoWincheck();	
-	virtual bool CanBeMovedOnBalance(int ClientID);
+public:
+	CGameControllerFLY(class CGameContext *pGameServer);
+	
+	// event
+	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
+	virtual bool OnEntity(int Index, vec2 Pos);
+
+	// general
 	virtual void Snap(int SnappingClient);
 	virtual void Tick();
-	
-	virtual bool OnEntity(int Index, vec2 Pos);
-	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
+
+	vec2 GetTeleporter(int ID) { return m_pTeleporter[ID]; }
 };
 
 #endif

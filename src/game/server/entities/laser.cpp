@@ -1,8 +1,11 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <engine/shared/config.h>
-#include <game/generated/protocol.h>
+
 #include <game/server/gamecontext.h>
+#include <game/server/player.h>
+
+#include "character.h"
 #include "laser.h"
 
 CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner)
@@ -36,16 +39,16 @@ bool CLaser::HitCharacter(vec2 From, vec2 To)
 		int Mask = CmaskOne(m_Owner);
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS && GameServer()->m_apPlayers[i]->m_SpectatorID == m_Owner)
+			if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS && GameServer()->m_apPlayers[i]->GetSpectatorID() == m_Owner)
 				Mask |= CmaskOne(i);
 		}
 		GameServer()->CreateSound(GameServer()->m_apPlayers[m_Owner]->m_ViewPos, SOUND_HIT, Mask);
 
 		// kill character
-		pHit->Die(m_Owner, WEAPON_RIFLE);
+		pHit->Die(m_Owner, WEAPON_LASER);
 	}
 	else
-		pHit->TakeDamage(vec2(0.f, 0.f), GameServer()->Tuning()->m_LaserDamage, m_Owner, WEAPON_RIFLE);
+		pHit->TakeDamage(vec2(0.f, 0.f), GameServer()->Tuning()->m_LaserDamage, m_Owner, WEAPON_LASER);
 	return true;
 }
 
@@ -82,11 +85,11 @@ void CLaser::DoBounce()
 			if(m_Bounces > GameServer()->Tuning()->m_LaserBounceNum)
 				m_Energy = -1;
 
-			GameServer()->CreateSound(m_Pos, SOUND_RIFLE_BOUNCE);
+			GameServer()->CreateSound(m_Pos, SOUND_LASER_BOUNCE);
 
 			// laser jumps
 			if(m_Bounces == 1 && g_Config.m_SvLaserjumps && g_Config.m_SvInstagib)
-				GameServer()->CreateExplosion(m_Pos, m_Owner, WEAPON_RIFLE, false);
+				GameServer()->CreateExplosion(m_Pos, m_Owner, WEAPON_LASER, false);
 		}
 	}
 	else
