@@ -1,10 +1,12 @@
 // copyright (c) 2007 magnus auvinen, see licence.txt for more info
 #include <engine/shared/config.h>
+
 #include <game/mapitems.h>
 #include <game/server/entities/character.h>
 #include <game/server/entities/flag.h>
 #include <game/server/player.h>
 #include <game/server/gamecontext.h>
+
 #include "fastcap.h"
 
 CGameControllerFC::CGameControllerFC(class CGameContext *pGameServer)
@@ -18,46 +20,20 @@ CGameControllerFC::CGameControllerFC(class CGameContext *pGameServer)
 	m_GameFlags = GAMEFLAG_TEAMS|GAMEFLAG_FLAGS;
 }
 
-bool CGameControllerFC::OnEntity(int Index, vec2 Pos)
+// balancing
+bool CGameControllerFC::CanBeMovedOnBalance(int Cid)
 {
-	if(IGameController::OnEntity(Index, Pos))
-		return true;
-	
-	int Team = -1;
-	if(Index == ENTITY_FLAGSTAND_RED) Team = TEAM_RED;
-	if(Index == ENTITY_FLAGSTAND_BLUE) Team = TEAM_BLUE;
-	if(Team == -1)
-		return false;
-		
-	CFlag *F = new CFlag(&GameServer()->m_World, Team, Pos, 0x0);
-	m_apFlags[Team] = F;
+	CCharacter* Character = GameServer()->m_apPlayers[Cid]->GetCharacter();
+	if(Character)
+	{
+		for(int fi = 0; fi < 2; fi++)
+		{
+			CFlag *F = m_apFlags[fi];
+			if(F->m_pCarryingCharacter == Character)
+				return false;
+		}
+	}
 	return true;
-}
-
-bool CGameControllerFC::IsOwnFlagStand(vec2 Pos, int Team)
-{
-	for(int fi = 0; fi < 2; fi++)
-	{
-		CFlag *F = m_apFlags[fi];
-			
-		if(F && F->m_Team == Team && distance(F->m_Pos, Pos) < 32)
-			return true;
-	}
-	
-	return false;
-}
-
-bool CGameControllerFC::IsEnemyFlagStand(vec2 Pos, int Team)
-{
-	for(int fi = 0; fi < 2; fi++)
-	{
-		CFlag *F = m_apFlags[fi];
-			
-		if(F && F->m_Team != Team && distance(F->m_Pos, Pos) < 32)
-			return true;
-	}
-	
-	return false;
 }
 
 int CGameControllerFC::OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon)
@@ -84,41 +60,20 @@ void CGameControllerFC::OnCharacterSpawn(class CCharacter *pChr)
 		pChr->GiveWeapon(WEAPON_GRENADE, 10);
 }
 
-bool CGameControllerFC::CanSpawn(CPlayer *pPlayer, vec2 *pOutPos)
+// event
+bool CGameControllerFC::OnEntity(int Index, vec2 Pos)
 {
-	CSpawnEval Eval;
+	if(IGameController::OnEntity(Index, Pos))
+		return true;
 	
-	// spectators can't spawn
-	if(pPlayer->GetTeam() == -1)
+	int Team = -1;
+	if(Index == ENTITY_FLAGSTAND_RED) Team = TEAM_RED;
+	if(Index == ENTITY_FLAGSTAND_BLUE) Team = TEAM_BLUE;
+	if(Team == -1)
 		return false;
-
-	Eval.m_FriendlyTeam = pPlayer->GetTeam();
-	
-	// try first enemy spawns, than normal, than own
-	EvaluateSpawnType(&Eval, 1+((pPlayer->GetTeam()+1)&1));
-	if(!Eval.m_Got)
-	{
-		EvaluateSpawnType(&Eval, 0);
-		if(!Eval.m_Got)
-			EvaluateSpawnType(&Eval, 1+(pPlayer->GetTeam()&1));
-	}
-	
-	*pOutPos = Eval.m_Pos;
-	return Eval.m_Got;
-}
-
-bool CGameControllerFC::CanBeMovedOnBalance(int Cid)
-{
-	CCharacter* Character = GameServer()->m_apPlayers[Cid]->GetCharacter();
-	if(Character)
-	{
-		for(int fi = 0; fi < 2; fi++)
-		{
-			CFlag *F = m_apFlags[fi];
-			if(F->m_pCarryingCharacter == Character)
-				return false;
-		}
-	}
+		
+	CFlag *F = new CFlag(&GameServer()->m_World, Team, Pos, 0x0);
+	m_apFlags[Team] = F;
 	return true;
 }
 
@@ -156,6 +111,58 @@ bool CGameControllerFC::OnRaceEnd(int ID, float FinishTime)
 	return true;
 }
 
+// info
+bool CGameControllerFC::IsOwnFlagStand(vec2 Pos, int Team)
+{
+	for(int fi = 0; fi < 2; fi++)
+	{
+		CFlag *F = m_apFlags[fi];
+			
+		if(F && F->m_Team == Team && distance(F->m_Pos, Pos) < 32)
+			return true;
+	}
+	
+	return false;
+}
+
+bool CGameControllerFC::IsEnemyFlagStand(vec2 Pos, int Team)
+{
+	for(int fi = 0; fi < 2; fi++)
+	{
+		CFlag *F = m_apFlags[fi];
+			
+		if(F && F->m_Team != Team && distance(F->m_Pos, Pos) < 32)
+			return true;
+	}
+	
+	return false;
+}
+
+// spawn
+bool CGameControllerFC::CanSpawn(int Team, vec2 *pOutPos)
+{
+	CSpawnEval Eval;
+	
+	// spectators can't spawn
+	if(Team == -1)
+		return false;
+
+	Eval.m_FriendlyTeam = Team;
+	
+	// try first enemy spawns, than normal, than own
+	EvaluateSpawnType(&Eval, 1+((Team+1)&1));
+	if(!Eval.m_Got)
+	{
+		EvaluateSpawnType(&Eval, 0);
+		if(!Eval.m_Got)
+			EvaluateSpawnType(&Eval, 1+(Team&1));
+	}
+	
+	*pOutPos = Eval.m_Pos;
+	return Eval.m_Got;
+}
+
+// general
 void CGameControllerFC::Snap(int SnappingClient)
 {
 	IGameController::Snap(SnappingClient);

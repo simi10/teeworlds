@@ -7,7 +7,17 @@
 
 class CGameControllerRACE : public IGameController
 {
+	
+#if defined(CONF_TEERACE)
+	// demo
+	int m_aStopRecordTick[MAX_CLIENTS];
+#endif
+
 public:
+	CGameControllerRACE(class CGameContext *pGameServer);
+	~CGameControllerRACE();
+
+	// race
 	enum
 	{
 		RACE_NONE = 0,
@@ -15,6 +25,7 @@ public:
 		RACE_FINISHED,
 	};
 
+	// race
 	struct CRaceData
 	{
 		int m_RaceState;
@@ -38,26 +49,23 @@ public:
 			m_StartAddTime = 0.0f;
 		}
 	} m_aRace[MAX_CLIENTS];
-	
-	CGameControllerRACE(class CGameContext *pGameServer);
-	~CGameControllerRACE();
-	
-	vec2 *m_pTeleporter;
-	
-#if defined(CONF_TEERACE)
-	int m_aStopRecordTick[MAX_CLIENTS];
-#endif
-	
-	void InitTeleporter();
 
-	virtual void DoWincheck();
-	virtual void Tick();
+	vec2 *m_pTeleporter;
+
+	// game
+	virtual void DoWincheckMatch();
+
+	// event
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
 
 	virtual bool OnCheckpoint(int ID, int z);
 	virtual bool OnRaceStart(int ID, float StartAddTime, bool Check=true);
 	virtual bool OnRaceEnd(int ID, float FinishTime);
 
+	// general
+	virtual void Tick();
+
+	void InitTeleporter();
 	float GetTime(int ID);
 };
 

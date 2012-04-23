@@ -3,7 +3,10 @@
 #include <engine/shared/config.h>
 #include <game/generated/protocol.h>
 #include <game/server/gamecontext.h>
+#include <game/server/player.h>
 #include <game/server/gamemodes/race.h>
+
+#include "character.h"
 #include "projectile.h"
 
 CProjectile::CProjectile(CGameWorld *pGameWorld, int Type, int Owner, vec2 Pos, vec2 Dir, int Span,

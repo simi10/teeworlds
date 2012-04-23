@@ -31,36 +31,14 @@ CGameControllerRACE::~CGameControllerRACE()
 	delete[] m_pTeleporter;
 }
 
-void CGameControllerRACE::InitTeleporter()
+// game
+void CGameControllerRACE::DoWincheckMatch()
 {
-	int ArraySize = 0;
-	if(GameServer()->Collision()->Layers()->TeleLayer())
-	{
-		for(int i = 0; i < GameServer()->Collision()->Layers()->TeleLayer()->m_Width*GameServer()->Collision()->Layers()->TeleLayer()->m_Height; i++)
-		{
-			// get the array size
-			if(GameServer()->Collision()->m_pTele[i].m_Number > ArraySize)
-				ArraySize = GameServer()->Collision()->m_pTele[i].m_Number;
-		}
-	}
-	
-	if(!ArraySize)
-	{
-		m_pTeleporter = 0x0;
-		return;
-	}
-	
-	m_pTeleporter = new vec2[ArraySize];
-	mem_zero(m_pTeleporter, ArraySize*sizeof(vec2));
-	
-	// assign the values
-	for(int i = 0; i < GameServer()->Collision()->Layers()->TeleLayer()->m_Width*GameServer()->Collision()->Layers()->TeleLayer()->m_Height; i++)
-	{
-		if(GameServer()->Collision()->m_pTele[i].m_Number > 0 && GameServer()->Collision()->m_pTele[i].m_Type == TILE_TELEOUT)
-			m_pTeleporter[GameServer()->Collision()->m_pTele[i].m_Number-1] = vec2(i%GameServer()->Collision()->Layers()->TeleLayer()->m_Width*32+16, i/GameServer()->Collision()->Layers()->TeleLayer()->m_Width*32+16);
-	}
+	if(g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_GameStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60)
+		EndRound();
 }
 
+// event
 int CGameControllerRACE::OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon)
 {
 	int ClientID = pVictim->GetPlayer()->GetCID();
@@ -75,75 +53,6 @@ int CGameControllerRACE::OnCharacterDeath(class CCharacter *pVictim, class CPlay
 #endif
 
 	return 0;
-}
-
-void CGameControllerRACE::DoWincheck()
-{
-	if(m_GameOverTick == -1 && !m_Warmup)
-	{
-		if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60))
-			EndRound();
-	}
-}
-
-void CGameControllerRACE::Tick()
-{
-	IGameController::Tick();
-	DoWincheck();
-
-	for(int i = 0; i < MAX_CLIENTS; i++)
-	{
-		CRaceData *p = &m_aRace[i];
-
-		if(p->m_RaceState == RACE_STARTED && Server()->Tick()-p->m_RefreshTime >= Server()->TickSpeed())
-		{
-			int IntTime = (int)GetTime(i);
-
-			char aBuftime[128];
-			char aTmp[128];
-
-			CNetMsg_Sv_RaceTime Msg;
-			Msg.m_Time = IntTime;
-			Msg.m_Check = 0;
-
-			str_format(aBuftime, sizeof(aBuftime), "Current Time: %d min %d sec", IntTime/60, IntTime%60);
-
-			if(p->m_CpTick != -1 && p->m_CpTick > Server()->Tick())
-			{
-				Msg.m_Check = (int)(p->m_CpDiff*100);
-				str_format(aTmp, sizeof(aTmp), "\nCheckpoint | Diff : %+5.2f", p->m_CpDiff);
-				strcat(aBuftime, aTmp);
-			}
-
-			if(GameServer()->m_apPlayers[i]->m_IsUsingRaceClient)
-				Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, i);
-			else
-				GameServer()->SendBroadcast(aBuftime, i);
-
-			p->m_RefreshTime = Server()->Tick();
-		}
-		
-#if defined(CONF_TEERACE)
-		// stop recording at the finish
-		CPlayerData *pBest = GameServer()->Score()->PlayerData(i);
-		if(Server()->IsRecording(i))
-		{
-			if(Server()->Tick() == m_aStopRecordTick[i])
-			{
-				m_aStopRecordTick[i] = -1;
-				Server()->StopRecord(i);
-				continue;
-			}
-			
-			if(m_aRace[i].m_RaceState == RACE_STARTED && pBest->m_Time > 0 && pBest->m_Time < GetTime(i))
-				Server()->StopRecord(i);
-		}
-		
-		// stop ghost if time is bigger then best time
-		if(Server()->IsGhostRecording(i) && m_aRace[i].m_RaceState == RACE_STARTED && pBest->m_Time > 0 && pBest->m_Time < GetTime(i))
-			Server()->StopGhostRecord(i);
-#endif
-	}
 }
 
 bool CGameControllerRACE::OnCheckpoint(int ID, int z)
@@ -235,6 +144,96 @@ bool CGameControllerRACE::OnRaceEnd(int ID, float FinishTime)
 #endif
 
 	return true;
+}
+
+// general
+void CGameControllerRACE::Tick()
+{
+	IGameController::Tick();
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		CRaceData *p = &m_aRace[i];
+
+		if(p->m_RaceState == RACE_STARTED && Server()->Tick()-p->m_RefreshTime >= Server()->TickSpeed())
+		{
+			int IntTime = (int)GetTime(i);
+
+			char aBuftime[128];
+			char aTmp[128];
+
+			CNetMsg_Sv_RaceTime Msg;
+			Msg.m_Time = IntTime;
+			Msg.m_Check = 0;
+
+			str_format(aBuftime, sizeof(aBuftime), "Current Time: %d min %d sec", IntTime/60, IntTime%60);
+
+			if(p->m_CpTick != -1 && p->m_CpTick > Server()->Tick())
+			{
+				Msg.m_Check = (int)(p->m_CpDiff*100);
+				str_format(aTmp, sizeof(aTmp), "\nCheckpoint | Diff : %+5.2f", p->m_CpDiff);
+				strcat(aBuftime, aTmp);
+			}
+
+			if(GameServer()->m_apPlayers[i]->m_IsUsingRaceClient)
+				Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, i);
+			else
+				GameServer()->SendBroadcast(aBuftime, i);
+
+			p->m_RefreshTime = Server()->Tick();
+		}
+		
+#if defined(CONF_TEERACE)
+		// stop recording at the finish
+		CPlayerData *pBest = GameServer()->Score()->PlayerData(i);
+		if(Server()->IsRecording(i))
+		{
+			if(Server()->Tick() == m_aStopRecordTick[i])
+			{
+				m_aStopRecordTick[i] = -1;
+				Server()->StopRecord(i);
+				continue;
+			}
+			
+			if(m_aRace[i].m_RaceState == RACE_STARTED && pBest->m_Time > 0 && pBest->m_Time < GetTime(i))
+				Server()->StopRecord(i);
+		}
+		
+		// stop ghost if time is bigger then best time
+		if(Server()->IsGhostRecording(i) && m_aRace[i].m_RaceState == RACE_STARTED && pBest->m_Time > 0 && pBest->m_Time < GetTime(i))
+			Server()->StopGhostRecord(i);
+#endif
+	}
+}
+
+void CGameControllerRACE::InitTeleporter()
+{
+	int ArraySize = 0;
+	if(GameServer()->Collision()->Layers()->TeleLayer())
+	{
+		for(int i = 0; i < GameServer()->Collision()->Layers()->TeleLayer()->m_Width*GameServer()->Collision()->Layers()->TeleLayer()->m_Height; i++)
+		{
+			// get the array size
+			if(GameServer()->Collision()->m_pTele[i].m_Number > ArraySize)
+				ArraySize = GameServer()->Collision()->m_pTele[i].m_Number;
+		}
+	}
+	
+	if(!ArraySize)
+	{
+		m_pTeleporter = 0x0;
+		return;
+	}
+	
+	m_pTeleporter = new vec2[ArraySize];
+	mem_zero(m_pTeleporter, ArraySize*sizeof(vec2));
+	
+	// assign the values
+	for(int i = 0; i < GameServer()->Collision()->Layers()->TeleLayer()->m_Width*GameServer()->Collision()->Layers()->TeleLayer()->m_Height; i++)
+	{
+		if(GameServer()->Collision()->m_pTele[i].m_Number > 0 && GameServer()->Collision()->m_pTele[i].m_Type == TILE_TELEOUT)
+			m_pTeleporter[GameServer()->Collision()->m_pTele[i].m_Number-1] = vec2(i%GameServer()->Collision()->Layers()->TeleLayer()->m_Width*32+16, i/GameServer()->Collision()->Layers()->TeleLayer()->m_Width*32+16);
+	}
 }
 
 float CGameControllerRACE::GetTime(int ID)
