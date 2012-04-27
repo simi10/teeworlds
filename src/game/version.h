@@ -5,7 +5,7 @@
 #include "generated/nethash.cpp"
 #define GAME_VERSION "0.7 trunk"
 //#define GAME_NETVERSION "0.7 " GAME_NETVERSION_HASH
-#define GAME_NETVERSION "0.7 626fce9a778df4d4"
+#define GAME_NETVERSION "0.7 3692f37a3e759d43"
 #define TEECOMP_VERSION "0.7.0"
 static const char GAME_RELEASE_VERSION[8] = {'0', '.', '6', '1', 0};
 #endif
