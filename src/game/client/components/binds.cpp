@@ -118,6 +118,8 @@ void CBinds::SetDefaults()
 	Bind(KEY_F3, "vote yes");
 	Bind(KEY_F4, "vote no");
 
+	Bind('r', "ready_change");
+
 	Bind(KEY_LSHIFT, "+statboard");
 }
 
