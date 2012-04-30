@@ -1463,26 +1463,25 @@ void CMenus::OnMapLoad()
 		{
 			CMapItemLayer *pLayer = m_pClient->Layers()->GetLayer(pGroup->m_StartLayer+l);
 
+			// reset buffer
+			aBuf[0] = 0;
+
 			// load layer name
-			if(m_pClient->Layers()->GameLayer() != (CMapItemLayerTilemap*)pLayer) // game layer dont need a name
+			if(pLayer->m_Type == LAYERTYPE_TILES && ((CMapItemLayerTilemap*)pLayer)->m_Flags == 0) // special layers don't need a name
 			{
 				if(pLayer->m_Version >= 3)
-				{
-					if(pLayer->m_Type == LAYERTYPE_QUADS)
-						IntsToStr(((CMapItemLayerQuads*)pLayer)->m_aName, sizeof(aBuf)/sizeof(int), aBuf);
-					else
-						IntsToStr(((CMapItemLayerTilemap*)pLayer)->m_aName, sizeof(aBuf)/sizeof(int), aBuf);
+					IntsToStr(((CMapItemLayerTilemap*)pLayer)->m_aName, sizeof(aBuf)/sizeof(int), aBuf);
+				
+				if(aBuf[0] == 0)
+					str_copy(aBuf, "Tiles", sizeof(aBuf));
+			}
+			else if(pLayer->m_Type == LAYERTYPE_QUADS)
+			{
+				if(pLayer->m_Version >= 2)
+					IntsToStr(((CMapItemLayerQuads*)pLayer)->m_aName, sizeof(aBuf)/sizeof(int), aBuf);
 
-					if(aBuf[0] == 0)
-						str_copy(aBuf, "Layer", sizeof(aBuf));
-				}
-				else
-				{
-					if(pLayer->m_Type == LAYERTYPE_QUADS)
-						str_copy(aBuf, "Quads", sizeof(aBuf));
-					else
-						str_copy(aBuf, "Tiles", sizeof(aBuf));
-				}
+				if(aBuf[0] == 0)
+					str_copy(aBuf, "Quads", sizeof(aBuf));
 			}
 
 			m_lLayers.add(CGroupLayer(aBuf));
