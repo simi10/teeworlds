@@ -8,6 +8,7 @@ Import("other/freetype/freetype.lua")
 config = NewConfig()
 config:Add(OptCCompiler("compiler"))
 config:Add(OptTestCompileC("stackprotector", "int main(){return 0;}", "-fstack-protector -fstack-protector-all"))
+config:Add(OptTestCompileC("minmacosxsdk", "int main(){return 0;}", "-mmacosx-version-min=10.5 -isysroot /Developer/SDKs/MacOSX10.5.sdk"))
 config:Add(OptLibrary("zlib", "zlib.h", false))
 config:Add(SDL.OptFind("sdl", true))
 config:Add(FreeType.OptFind("freetype", true))
@@ -152,8 +153,12 @@ function build(settings)
 			-- disable visibility attribute support for gcc on windows
 			settings.cc.defines:Add("NO_VIZ")
 		elseif platform == "macosx" then
-			settings.cc.flags:Add("-mmacosx-version-min=10.5", "-isysroot /Developer/SDKs/MacOSX10.5.sdk")
-			settings.link.flags:Add("-mmacosx-version-min=10.5", "-isysroot /Developer/SDKs/MacOSX10.5.sdk")
+			settings.cc.flags:Add("-mmacosx-version-min=10.5")
+			settings.link.flags:Add("-mmacosx-version-min=10.5")
+			if config.minmacosxsdk.value == 1 then
+				settings.cc.flags:Add("-isysroot /Developer/SDKs/MacOSX10.5.sdk")
+				settings.link.flags:Add("-isysroot /Developer/SDKs/MacOSX10.5.sdk")
+			end
 		elseif config.stackprotector.value == 1 then
 			settings.cc.flags:Add("-fstack-protector", "-fstack-protector-all")
 			settings.link.flags:Add("-fstack-protector", "-fstack-protector-all")
@@ -610,12 +615,12 @@ if platform == "macosx" then
 		PseudoTarget("server_sql_release", "server_sql_release_x86", "server_sql_release_x86_64", "server_sql_release_ppc")
 		PseudoTarget("server_teerace_release", "server_teerace_release_x86", "server_teerace_release_x86_64", "server_teerace_release_ppc")
 		PseudoTarget("server_teerace_sql_release", "server_teerace_sql_release_x86", "server_teerace_sql_release_x86_64", "server_teerace_sql_release_ppc")
-		PseudoTarget("server_debug", "server_debug_x86", "server_release_x86_64", "server_debug_ppc")
+		PseudoTarget("server_debug", "server_debug_x86", "server_debug_x86_64", "server_debug_ppc")
 		PseudoTarget("server_sql_debug", "server_sql_debug_x86", "server_sql_debug_x86_64", "server_sql_debug_ppc")
 		PseudoTarget("server_teerace_debug", "server_teerace_debug_x86", "server_teerace_debug_x86_64", "server_teerace_debug_ppc")
 		PseudoTarget("server_teerace_sql_debug", "server_teerace_sql_debug_x86", "server_teerace_sql_debug_x86_64", "server_teerace_sql_debug_ppc")
 		PseudoTarget("client_release", "client_release_x86", "server_release_x86_64", "client_release_ppc")
-		PseudoTarget("client_debug", "client_debug_x86", "server_release_x86_64", "client_debug_ppc")
+		PseudoTarget("client_debug", "client_debug_x86", "server_debug_x86_64", "client_debug_ppc")
 	else
 		PseudoTarget("release", ppc_r)
 		PseudoTarget("sql_release", sql_ppc_r)
