@@ -158,7 +158,7 @@ bool CChat::OnInput(IInput::CEvent Event)
 		{
 			int SearchType = ((m_CompletionChosen+i)%(2*MAX_CLIENTS))/MAX_CLIENTS;
 			int Index = (m_CompletionChosen+i)%MAX_CLIENTS;
-			if(!m_pClient->m_Snap.m_paPlayerInfos[Index])
+			if(!m_pClient->m_aClients[Index].m_Active)
 				continue;
 
 			bool Found = false;
@@ -279,7 +279,7 @@ void CChat::AddLine(int ClientID, int Team, const char *pLine)
 {
 	if(*pLine == 0 || (ClientID != -1 && (m_pClient->m_aClients[ClientID].m_aName[0] == '\0' || // unknown client
 		m_pClient->m_aClients[ClientID].m_ChatIgnore ||
-		(m_pClient->m_Snap.m_LocalClientID != ClientID && g_Config.m_ClShowChatFriends && !m_pClient->m_aClients[ClientID].m_Friend))))
+		(m_pClient->m_LocalClientID != ClientID && g_Config.m_ClShowChatFriends && !m_pClient->m_aClients[ClientID].m_Friend))))
 		return;
 
 	bool Highlighted = false;
@@ -307,10 +307,10 @@ void CChat::AddLine(int ClientID, int Team, const char *pLine)
 		m_aLines[m_CurrentLine].m_NameColor = -2;
 
 		// check for highlighted name
-		const char *pHL = str_find_nocase(pLine, m_pClient->m_aClients[m_pClient->m_Snap.m_LocalClientID].m_aName);
+		const char *pHL = str_find_nocase(pLine, m_pClient->m_aClients[m_pClient->m_LocalClientID].m_aName);
 		if(pHL)
 		{
-			int Length = str_length(m_pClient->m_aClients[m_pClient->m_Snap.m_LocalClientID].m_aName);
+			int Length = str_length(m_pClient->m_aClients[m_pClient->m_LocalClientID].m_aName);
 			if((pLine == pHL || pHL[-1] == ' ') && (pHL[Length] == 0 || pHL[Length] == ' ' || (pHL[Length] == ':' && pHL[Length+1] == ' ')))
 				Highlighted = true;
 		}
@@ -326,7 +326,7 @@ void CChat::AddLine(int ClientID, int Team, const char *pLine)
 			if(m_pClient->m_aClients[ClientID].m_Team == TEAM_SPECTATORS)
 				m_aLines[m_CurrentLine].m_NameColor = TEAM_SPECTATORS;
 
-			if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_TEAMS)
+			if(m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS)
 			{
 				if(m_pClient->m_aClients[ClientID].m_Team == TEAM_RED)
 					m_aLines[m_CurrentLine].m_NameColor = TEAM_RED;

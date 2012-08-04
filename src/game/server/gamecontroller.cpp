@@ -38,6 +38,10 @@ IGameController::IGameController(CGameContext *pGameServer)
 	// info
 	m_GameFlags = 0;
 	m_pGameType = "unknown";
+	m_GameInfo.m_MatchCurrent = m_MatchCount+1;
+	m_GameInfo.m_MatchNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvMatchesPerMap) ? g_Config.m_SvMatchesPerMap : 0;
+	m_GameInfo.m_ScoreLimit = g_Config.m_SvScorelimit;
+	m_GameInfo.m_TimeLimit = g_Config.m_SvTimelimit;
 
 	// map
 	m_aMapWish[0] = 0;
@@ -57,7 +61,7 @@ void IGameController::DoActivityCheck()
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		if(GameServer()->m_apPlayers[i] && !GameServer()->m_apPlayers[i]->IsDummy() && GameServer()->m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS &&
-			!Server()->IsAuthed(i) && (Server()->Tick() > GameServer()->m_apPlayers[i]->m_LastActionTick+g_Config.m_SvInactiveKickTime*Server()->TickSpeed()*60))
+			!Server()->IsAuthed(i) && (GameServer()->m_apPlayers[i]->m_InactivityTickCounter > g_Config.m_SvInactiveKickTime*Server()->TickSpeed()*60))
 		{
 			switch(g_Config.m_SvInactiveKick)
 			{
@@ -310,20 +314,27 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 	return false;
 }
 
-void IGameController::OnPlayerDisconnect(CPlayer *pPlayer, const char *pReason)
+void IGameController::OnPlayerConnect(CPlayer *pPlayer)
+{
+	int ClientID = pPlayer->GetCID();
+	pPlayer->Respawn();
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "team_join player='%d:%s' team=%d", ClientID, Server()->ClientName(ClientID), pPlayer->GetTeam());
+	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
+
+	// update game info
+	UpdateGameInfo(ClientID);
+}
+
+void IGameController::OnPlayerDisconnect(CPlayer *pPlayer)
 {
 	pPlayer->OnDisconnect();
 
 	int ClientID = pPlayer->GetCID();
 	if(Server()->ClientIngame(ClientID))
 	{
-		char aBuf[512];
-		if(pReason && *pReason)
-			str_format(aBuf, sizeof(aBuf), "'%s' has left the game (%s)", Server()->ClientName(ClientID), pReason);
-		else
-			str_format(aBuf, sizeof(aBuf), "'%s' has left the game", Server()->ClientName(ClientID));
-		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-
+		char aBuf[128];
 		str_format(aBuf, sizeof(aBuf), "leave player='%d:%s'", ClientID, Server()->ClientName(ClientID));
 		GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "game", aBuf);
 	}
@@ -337,21 +348,6 @@ void IGameController::OnPlayerDisconnect(CPlayer *pPlayer, const char *pReason)
 
 void IGameController::OnPlayerInfoChange(CPlayer *pPlayer)
 {
-	const int aTeamColors[2] = {65387, 10223467};
-	if(IsTeamplay())
-	{
-		pPlayer->m_TeeInfos.m_UseCustomColor = 1;
-		if(pPlayer->GetTeam() >= TEAM_RED && pPlayer->GetTeam() <= TEAM_BLUE)
-		{
-			pPlayer->m_TeeInfos.m_ColorBody = aTeamColors[pPlayer->GetTeam()];
-			pPlayer->m_TeeInfos.m_ColorFeet = aTeamColors[pPlayer->GetTeam()];
-		}
-		else
-		{
-			pPlayer->m_TeeInfos.m_ColorBody = 12895054;
-			pPlayer->m_TeeInfos.m_ColorFeet = 12895054;
-		}
-	}
 }
 
 void IGameController::OnPlayerReadyChange(CPlayer *pPlayer)
@@ -414,8 +410,8 @@ void IGameController::DoWincheckMatch()
 	if(IsTeamplay())
 	{
 		// check score win condition
-		if((g_Config.m_SvScorelimit > 0 && (m_aTeamscore[TEAM_RED] >= g_Config.m_SvScorelimit || m_aTeamscore[TEAM_BLUE] >= g_Config.m_SvScorelimit)) ||
-			(g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_GameStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60))
+		if((m_GameInfo.m_ScoreLimit > 0 && (m_aTeamscore[TEAM_RED] >= m_GameInfo.m_ScoreLimit || m_aTeamscore[TEAM_BLUE] >= m_GameInfo.m_ScoreLimit)) ||
+			(m_GameInfo.m_TimeLimit > 0 && (Server()->Tick()-m_GameStartTick) >= m_GameInfo.m_TimeLimit*Server()->TickSpeed()*60))
 		{
 			if(m_aTeamscore[TEAM_RED] != m_aTeamscore[TEAM_BLUE] || m_GameFlags&GAMEFLAG_SURVIVAL)
 				EndMatch();
@@ -443,8 +439,8 @@ void IGameController::DoWincheckMatch()
 		}
 
 		// check score win condition
-		if((g_Config.m_SvScorelimit > 0 && Topscore >= g_Config.m_SvScorelimit) ||
-			(g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_GameStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60))
+		if((m_GameInfo.m_ScoreLimit > 0 && Topscore >= m_GameInfo.m_ScoreLimit) ||
+			(m_GameInfo.m_TimeLimit > 0 && (Server()->Tick()-m_GameStartTick) >= m_GameInfo.m_TimeLimit*Server()->TickSpeed()*60))
 		{
 			if(TopscoreCount == 1)
 				EndMatch();
@@ -462,6 +458,18 @@ void IGameController::ResetGame()
 	SetGameState(IGS_GAME_RUNNING);
 	m_GameStartTick = Server()->Tick();
 	m_SuddenDeath = 0;
+
+	int MatchNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvMatchesPerMap) ? g_Config.m_SvMatchesPerMap : 0;
+	if(MatchNum == 0)
+		m_MatchCount = 0;
+	bool GameInfoChanged = (m_GameInfo.m_MatchCurrent != m_MatchCount+1) || (m_GameInfo.m_MatchNum != MatchNum) ||
+							(m_GameInfo.m_ScoreLimit != g_Config.m_SvScorelimit) || (m_GameInfo.m_TimeLimit != g_Config.m_SvTimelimit);
+	m_GameInfo.m_MatchCurrent = m_MatchCount+1;
+	m_GameInfo.m_MatchNum = MatchNum;
+	m_GameInfo.m_ScoreLimit = g_Config.m_SvScorelimit;
+	m_GameInfo.m_TimeLimit = g_Config.m_SvTimelimit;
+	if(GameInfoChanged)
+		UpdateGameInfo(-1);
 
 	// do team-balancing
 	DoTeamBalance();
@@ -583,7 +591,7 @@ void IGameController::SetGameState(EGameState GameState, int Timer)
 	case IGS_END_ROUND:
 	case IGS_END_MATCH:
 		// only possible when game is running or over
-		if(m_GameState == IGS_GAME_RUNNING || m_GameState == IGS_END_MATCH || m_GameState == IGS_END_ROUND)
+		if(m_GameState == IGS_GAME_RUNNING || m_GameState == IGS_END_MATCH || m_GameState == IGS_END_ROUND || m_GameState == IGS_GAME_PAUSED)
 		{
 			m_GameState = GameState;
 			m_GameStateTimer = Timer*Server()->TickSpeed();
@@ -629,51 +637,69 @@ void IGameController::StartRound()
 // general
 void IGameController::Snap(int SnappingClient)
 {
-	CNetObj_GameInfo *pGameInfoObj = (CNetObj_GameInfo *)Server()->SnapNewItem(NETOBJTYPE_GAMEINFO, 0, sizeof(CNetObj_GameInfo));
-	if(!pGameInfoObj)
+	CNetObj_GameData *pGameData = static_cast<CNetObj_GameData *>(Server()->SnapNewItem(NETOBJTYPE_GAMEDATA, 0, sizeof(CNetObj_GameData)));
+	if(!pGameData)
 		return;
 
-	pGameInfoObj->m_GameFlags = m_GameFlags;
-
-	pGameInfoObj->m_GameStateFlags = 0;
-	pGameInfoObj->m_GameStateTimer = 0;
+	pGameData->m_GameStartTick = m_GameStartTick;
+	pGameData->m_GameStateFlags = 0;
+	pGameData->m_GameStateEndTick = 0; // no timer/infinite = 0, on end = GameEndTick, otherwise = GameStateEndTick
 	switch(m_GameState)
 	{
 	case IGS_WARMUP_GAME:
 	case IGS_WARMUP_USER:
-		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_WARMUP;
-		pGameInfoObj->m_GameStateTimer = m_GameStateTimer;
+		pGameData->m_GameStateFlags |= GAMESTATEFLAG_WARMUP;
+		if(m_GameStateTimer != TIMER_INFINITE)
+			pGameData->m_GameStateEndTick = Server()->Tick()+m_GameStateTimer;
 		break;
 	case IGS_START_COUNTDOWN:
-		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_STARTCOUNTDOWN|GAMESTATEFLAG_PAUSED;
-		pGameInfoObj->m_GameStateTimer = m_GameStateTimer;
+		pGameData->m_GameStateFlags |= GAMESTATEFLAG_STARTCOUNTDOWN|GAMESTATEFLAG_PAUSED;
+		if(m_GameStateTimer != TIMER_INFINITE)
+			pGameData->m_GameStateEndTick = Server()->Tick()+m_GameStateTimer;
 		break;
 	case IGS_GAME_PAUSED:
-		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_PAUSED;
-		pGameInfoObj->m_GameStateTimer = m_GameStateTimer;
+		pGameData->m_GameStateFlags |= GAMESTATEFLAG_PAUSED;
+		if(m_GameStateTimer != TIMER_INFINITE)
+			pGameData->m_GameStateEndTick = Server()->Tick()+m_GameStateTimer;
 		break;
 	case IGS_END_ROUND:
-		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_ROUNDOVER;
-		pGameInfoObj->m_GameStateTimer = Server()->Tick()-m_GameStartTick-10*Server()->TickSpeed()+m_GameStateTimer;
+		pGameData->m_GameStateFlags |= GAMESTATEFLAG_ROUNDOVER;
+		pGameData->m_GameStateEndTick = Server()->Tick()-m_GameStartTick-TIMER_END*Server()->TickSpeed()+m_GameStateTimer;
 		break;
 	case IGS_END_MATCH:
-		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_GAMEOVER;
-		pGameInfoObj->m_GameStateTimer = Server()->Tick()-m_GameStartTick-10*Server()->TickSpeed()+m_GameStateTimer;
+		pGameData->m_GameStateFlags |= GAMESTATEFLAG_GAMEOVER;
+		pGameData->m_GameStateEndTick = Server()->Tick()-m_GameStartTick-TIMER_END*Server()->TickSpeed()+m_GameStateTimer;
 		break;
 	case IGS_GAME_RUNNING:
 		// not effected
 		break;
 	}
 	if(m_SuddenDeath)
-		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_SUDDENDEATH;
+		pGameData->m_GameStateFlags |= GAMESTATEFLAG_SUDDENDEATH;
 
-	pGameInfoObj->m_GameStartTick = m_GameStartTick;
+	if(IsTeamplay())
+	{
+		CNetObj_GameDataTeam *pGameDataTeam = static_cast<CNetObj_GameDataTeam *>(Server()->SnapNewItem(NETOBJTYPE_GAMEDATATEAM, 0, sizeof(CNetObj_GameDataTeam)));
+		if(!pGameDataTeam)
+			return;
 
-	pGameInfoObj->m_ScoreLimit = g_Config.m_SvScorelimit;
-	pGameInfoObj->m_TimeLimit = g_Config.m_SvTimelimit;
+		pGameDataTeam->m_TeamscoreRed = m_aTeamscore[TEAM_RED];
+		pGameDataTeam->m_TeamscoreBlue = m_aTeamscore[TEAM_BLUE];
+	}
 
-	pGameInfoObj->m_MatchNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvMatchesPerMap) ? g_Config.m_SvMatchesPerMap : 0;
-	pGameInfoObj->m_MatchCurrent = m_MatchCount+1;
+	// demo recording
+	if(SnappingClient == -1)
+	{
+		CNetObj_De_GameInfo *pGameInfo = static_cast<CNetObj_De_GameInfo *>(Server()->SnapNewItem(NETOBJTYPE_DE_GAMEINFO, 0, sizeof(CNetObj_De_GameInfo)));
+		if(!pGameInfo)
+			return;
+
+		pGameInfo->m_GameFlags = m_GameFlags;
+		pGameInfo->m_ScoreLimit = m_GameInfo.m_ScoreLimit;
+		pGameInfo->m_TimeLimit = m_GameInfo.m_TimeLimit;
+		pGameInfo->m_MatchNum = m_GameInfo.m_MatchNum;
+		pGameInfo->m_MatchCurrent = m_GameInfo.m_MatchCurrent;
+	}
 }
 
 void IGameController::Tick()
@@ -710,8 +736,8 @@ void IGameController::Tick()
 			case IGS_END_MATCH:
 				// start next match
 				CycleMap();
-				StartMatch();
 				m_MatchCount++;
+				StartMatch();
 				break;
 			case IGS_WARMUP_GAME:
 			case IGS_GAME_RUNNING:
@@ -764,7 +790,7 @@ void IGameController::Tick()
 	DoActivityCheck();
 
 	// win check
-	if(m_GameState == IGS_GAME_RUNNING && !GameServer()->m_World.m_ResetRequested)
+	if((m_GameState == IGS_GAME_RUNNING || m_GameState == IGS_GAME_PAUSED) && !GameServer()->m_World.m_ResetRequested)
 	{
 		if(m_GameFlags&GAMEFLAG_SURVIVAL)
 			DoWincheckRound();
@@ -816,6 +842,29 @@ const char *IGameController::GetTeamName(int Team) const
 	return "spectators";
 }
 
+void IGameController::UpdateGameInfo(int ClientID)
+{
+	CNetMsg_Sv_GameInfo GameInfoMsg;
+	GameInfoMsg.m_GameFlags = m_GameFlags;
+	GameInfoMsg.m_ScoreLimit = m_GameInfo.m_ScoreLimit;
+	GameInfoMsg.m_TimeLimit = m_GameInfo.m_TimeLimit;
+	GameInfoMsg.m_MatchNum = m_GameInfo.m_MatchNum;
+	GameInfoMsg.m_MatchCurrent = m_GameInfo.m_MatchCurrent;
+
+	if(ClientID == -1)
+	{
+		for(int i = 0; i < MAX_CLIENTS; ++i)
+		{
+			if(!GameServer()->m_apPlayers[i] || !Server()->ClientIngame(i))
+				continue;
+
+			Server()->SendPackMsg(&GameInfoMsg, MSGFLAG_VITAL|MSGFLAG_NORECORD, i);
+		}
+	}
+	else
+		Server()->SendPackMsg(&GameInfoMsg, MSGFLAG_VITAL|MSGFLAG_NORECORD, ClientID);
+}
+
 // map
 static bool IsSeparator(char c) { return c == ';' || c == ' ' || c == ',' || c == '\t'; }
 
@@ -840,7 +889,7 @@ void IGameController::CycleMap()
 	if(!str_length(g_Config.m_SvMaprotation))
 		return;
 
-	if(m_MatchCount < g_Config.m_SvMatchesPerMap-1)
+	if(m_MatchCount < m_GameInfo.m_MatchNum-1)
 	{
 		if(g_Config.m_SvMatchSwap)
 			GameServer()->SwapTeams();
@@ -1045,13 +1094,15 @@ void IGameController::DoTeamChange(CPlayer *pPlayer, int Team, bool DoChatMsg)
 	pPlayer->SetTeam(Team);
 
 	int ClientID = pPlayer->GetCID();
-	char aBuf[128];
-	if(DoChatMsg)
-	{
-		str_format(aBuf, sizeof(aBuf), "'%s' joined the %s", Server()->ClientName(ClientID), GetTeamName(Team));
-		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-	}
 
+	// notify clients
+	CNetMsg_Sv_Team Msg;
+	Msg.m_ClientID = ClientID;
+	Msg.m_Team = Team;
+	Msg.m_Silent = DoChatMsg ? 0 : 1;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_NORECORD, -1);
+
+	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "team_join player='%d:%s' m_Team=%d", ClientID, Server()->ClientName(ClientID), Team);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
