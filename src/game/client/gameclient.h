@@ -58,13 +58,10 @@ class CGameClient : public IGameClient
 	int m_PredictedTick;
 	int m_LastNewPredictedTick;
 
-	int64 m_LastSendInfo;
-
 	static void ConTeam(IConsole::IResult *pResult, void *pUserData);
 	static void ConKill(IConsole::IResult *pResult, void *pUserData);
 	static void ConReadyChange(IConsole::IResult *pResult, void *pUserData);
-
-	static void ConchainSpecialInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainFriendUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 public:
 	IKernel *Kernel() { return IInterface::Kernel(); }
@@ -121,6 +118,12 @@ public:
 	CCharacterCore m_PredictedPrevChar;
 	CCharacterCore m_PredictedChar;
 
+	struct CPlayerInfoItem
+	{
+		const CNetObj_PlayerInfo *m_pPlayerInfo;
+		int m_ClientID;
+	};
+
 	// snap pointers
 	struct CSnapState
 	{
@@ -130,17 +133,16 @@ public:
 		const CNetObj_SpectatorInfo *m_pSpectatorInfo;
 		const CNetObj_SpectatorInfo *m_pPrevSpectatorInfo;
 		const CNetObj_Flag *m_paFlags[2];
-		const CNetObj_GameInfo *m_pGameInfoObj;
-		const CNetObj_GameData *m_pGameDataObj;
-		int m_GameDataSnapID;
+		const CNetObj_GameData *m_pGameData;
+		const CNetObj_GameDataTeam *m_pGameDataTeam;
+		const CNetObj_GameDataFlag *m_pGameDataFlag;
+		int m_GameDataFlagSnapID;
+		
+		int m_NotReadyCount;
+		int m_AliveCount[NUM_TEAMS];
 
 		const CNetObj_PlayerInfo *m_paPlayerInfos[MAX_CLIENTS];
-		const CNetObj_PlayerInfo *m_paInfoByScore[MAX_CLIENTS];
-		const CNetObj_PlayerInfo *m_paInfoByTeam[MAX_CLIENTS];
-
-		int m_LocalClientID;
-		int m_NumPlayers;
-		int m_aTeamSize[2];
+		CPlayerInfoItem m_aInfoByScore[MAX_CLIENTS];
 
 		// spectate data
 		struct CSpectateInfo
@@ -172,16 +174,13 @@ public:
 	// client data
 	struct CClientData
 	{
-		int m_UseCustomColor;
-		int m_ColorBody;
-		int m_ColorFeet;
-
 		char m_aName[MAX_NAME_LENGTH];
 		char m_aClan[MAX_CLAN_LENGTH];
 		int m_Country;
-		char m_aSkinName[64];
-		int m_SkinID;
-		int m_SkinColor;
+		char m_aaSkinPartNames[6][24];
+		int m_aUseCustomColors[6];
+		int m_aSkinPartColors[6];
+		int m_SkinPartIDs[6];
 		int m_Team;
 		int m_Emoticon;
 		int m_EmoticonStart;
@@ -195,14 +194,30 @@ public:
 		bool m_ChatIgnore;
 		bool m_Friend;
 
+		void UpdateRenderInfo(bool UpdateSkinInfo);
+
 		// race
 		float m_Score;
-		
-		void UpdateRenderInfo();
+
 		void Reset();
 	};
 
 	CClientData m_aClients[MAX_CLIENTS];
+	int m_LocalClientID;
+
+	struct CGameInfo
+	{
+		int m_GameFlags;
+		int m_ScoreLimit;
+		int m_TimeLimit;
+		int m_MatchNum;
+		int m_MatchCurrent;
+
+		int m_NumPlayers;
+		int m_aTeamSize[NUM_TEAMS];
+	};
+
+	CGameInfo m_GameInfo;
 
 	CRenderTools m_RenderTools;
 
@@ -217,6 +232,7 @@ public:
 	virtual void OnStateChange(int NewState, int OldState);
 	virtual void OnMessage(int MsgId, CUnpacker *pUnpacker);
 	virtual void OnNewSnapshot();
+	virtual void OnDemoRecSnap();
 	virtual void OnPredict();
 	virtual void OnActivateEditor();
 	virtual int OnSnapInput(int *pData);
@@ -229,12 +245,13 @@ public:
 	virtual const char *GetItemName(int Type);
 	virtual const char *Version();
 	virtual const char *NetVersion();
+	const char *GetTeamName(int Team, bool Teamplay) const;
 
 
 	// actions
 	// TODO: move these
 	void SendSwitchTeam(int Team);
-	void SendInfo(bool Start);
+	void SendStartInfo();
 	void SendKill();
 	void SendReadyChange();
 

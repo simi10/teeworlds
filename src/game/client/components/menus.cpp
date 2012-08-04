@@ -19,12 +19,13 @@
 #include <game/generated/protocol.h>
 
 #include <game/generated/client_data.h>
+#include <game/client/components/camera.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
 #include <game/client/lineinput.h>
-#include <game/localization.h>
 #include <mastersrv/mastersrv.h>
 
+#include "maplayers.h"
 #include "countryflags.h"
 #include "menus.h"
 #include "skins.h"
@@ -53,9 +54,13 @@ CMenus::CMenus()
 
 	m_NeedRestartGraphics = false;
 	m_NeedRestartSound = false;
-	m_NeedSendinfo = false;
+	m_TeePartSelection = NO_SELECTION;
+	m_TeePartsColorSelection = NO_SELECTION;
+	m_aSaveSkinName[0] = 0;
 	m_MenuActive = true;
 	m_UseMouseButtons = true;
+
+	m_MenuPage = PAGE_START;
 
 	m_EscapePressed = false;
 	m_EnterPressed = false;
@@ -68,15 +73,25 @@ CMenus::CMenus()
 	m_aCallvoteReason[0] = 0;
 
 	m_FriendlistSelectedIndex = -1;
+
+	m_SelectedFilter = 0;
+
+	m_SelectedServer.m_Filter = -1;
+	m_SelectedServer.m_Index = -1;
 }
 
-vec4 CMenus::ButtonColorMul(const void *pID)
+float *CMenus::ButtonFade(const void *pID, float Seconds, int Checked)
 {
-	if(UI()->ActiveItem() == pID)
-		return vec4(1,1,1,0.5f);
-	else if(UI()->HotItem() == pID)
-		return vec4(1,1,1,1.5f);
-	return vec4(1,1,1,1);
+	float *pFade = (float*)pID;
+	if(UI()->HotItem() == pID || Checked)
+		*pFade = Seconds;
+	else if(*pFade > 0.0f)
+	{
+		*pFade -= Client()->RenderFrameTime();
+		if(*pFade < 0.0f)
+			*pFade = 0.0f;
+	}
+	return pFade;
 }
 
 int CMenus::DoButton_Icon(int ImageId, int SpriteId, const CUIRect *pRect)
@@ -112,18 +127,64 @@ int CMenus::DoButton_Toggle(const void *pID, int Checked, const CUIRect *pRect, 
 	return Active ? UI()->DoButtonLogic(pID, "", Checked, pRect) : 0;
 }
 
-int CMenus::DoButton_Menu(const void *pID, const char *pText, int Checked, const CUIRect *pRect)
+int CMenus::DoButton_Menu(const void *pID, const char *pText, int Checked, const CUIRect *pRect, float r, float FontFactor, int Corners)
 {
-	RenderTools()->DrawUIRect(pRect, vec4(1,1,1,0.5f)*ButtonColorMul(pID), CUI::CORNER_ALL, 5.0f);
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
+
+	RenderTools()->DrawUIRect(pRect, vec4(1.0f , 1.0f, 1.0f, 0.5f+(*pFade/Seconds)*0.25f), Corners, r);
 	CUIRect Temp;
 	pRect->HMargin(pRect->h>=20.0f?2.0f:1.0f, &Temp);
+	Temp.HMargin((Temp.h*FontFactor)/2.0f, &Temp);
 	UI()->DoLabel(&Temp, pText, Temp.h*ms_FontmodHeight, 0);
+	return UI()->DoButtonLogic(pID, pText, Checked, pRect);
+}
+
+int CMenus::DoButton_MenuImage(const void *pID, const char *pText, int Checked, const CUIRect *pRect, const char *pImageName, float r, float FontFactor)
+{
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
+
+	RenderTools()->DrawUIRect(pRect, vec4(1.0f , 1.0f, 1.0f, 0.5f+(*pFade/Seconds)*0.25f), CUI::CORNER_ALL, r);
+	CUIRect Text, Image;
+	pRect->VSplitRight(pRect->h*4.0f, &Text, &Image); // always correct ratio for image
+
+	// render image
+	const CMenuImage *pImage = FindMenuImage(pImageName);
+	if(pImage)
+	{
+		
+		Graphics()->TextureSet(pImage->m_GreyTexture);
+		Graphics()->QuadsBegin();
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+		IGraphics::CQuadItem QuadItem(Image.x, Image.y, Image.w, Image.h);
+		Graphics()->QuadsDrawTL(&QuadItem, 1);
+		Graphics()->QuadsEnd();
+
+		if(*pFade > 0.0f)
+		{
+			Graphics()->TextureSet(pImage->m_OrgTexture);
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, *pFade/Seconds);
+			Graphics()->QuadsDrawTL(&QuadItem, 1);
+			Graphics()->QuadsEnd();
+		}
+		
+	}
+
+	pRect->HMargin(pRect->h>=20.0f?2.0f:1.0f, &Text);
+	Text.HMargin((Text.h*FontFactor)/2.0f, &Text);
+	Text.VSplitLeft(r, 0, &Text);
+	UI()->DoLabel(&Text, pText, Text.h*ms_FontmodHeight, -1);
 	return UI()->DoButtonLogic(pID, pText, Checked, pRect);
 }
 
 void CMenus::DoButton_KeySelect(const void *pID, const char *pText, int Checked, const CUIRect *pRect)
 {
-	RenderTools()->DrawUIRect(pRect, vec4(1,1,1,0.5f)*ButtonColorMul(pID), CUI::CORNER_ALL, 5.0f);
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
+
+	RenderTools()->DrawUIRect(pRect, vec4(1.0f , 1.0f, 1.0f, 0.5f+(*pFade/Seconds)*0.25f), CUI::CORNER_ALL, 5.0f);
 	CUIRect Temp;
 	pRect->HMargin(1.0f, &Temp);
 	UI()->DoLabel(&Temp, pText, Temp.h*ms_FontmodHeight, 0);
@@ -134,7 +195,26 @@ int CMenus::DoButton_MenuTab(const void *pID, const char *pText, int Checked, co
 	if(Checked)
 		RenderTools()->DrawUIRect(pRect, ms_ColorTabbarActive, Corners, 10.0f);
 	else
+	{
 		RenderTools()->DrawUIRect(pRect, ms_ColorTabbarInactive, Corners, 10.0f);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.7f);
+	}
+
+	CUIRect Temp;
+	pRect->HMargin(2.0f, &Temp);
+	UI()->DoLabel(&Temp, pText, Temp.h*ms_FontmodHeight, 0);
+
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+	return UI()->DoButtonLogic(pID, pText, Checked, pRect);
+}
+
+int CMenus::DoButton_MenuTabTop(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Corners)
+{
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds, Checked);
+
+	RenderTools()->DrawUIRect(pRect, vec4(1.0f , 1.0f, 1.0f, 0.5f+(*pFade/Seconds)*0.25f), Corners, 12.0f);
+
 	CUIRect Temp;
 	pRect->HMargin(2.0f, &Temp);
 	UI()->DoLabel(&Temp, pText, Temp.h*ms_FontmodHeight, 0);
@@ -146,11 +226,33 @@ int CMenus::DoButton_GridHeader(const void *pID, const char *pText, int Checked,
 //void CMenus::ui_draw_grid_header(const void *id, const char *text, int checked, const CUIRect *r, const void *extra)
 {
 	if(Checked)
-		RenderTools()->DrawUIRect(pRect, vec4(1,1,1,0.5f), CUI::CORNER_T, 5.0f);
+		RenderTools()->DrawUIRect(pRect, vec4(1,1,1,0.5f), 0, 0.0f);
 	CUIRect t;
 	pRect->VSplitLeft(5.0f, 0, &t);
 	UI()->DoLabel(&t, pText, pRect->h*ms_FontmodHeight, -1);
 	return UI()->DoButtonLogic(pID, pText, Checked, pRect);
+}
+
+int CMenus::DoButton_GridHeaderIcon(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect, int Corners)
+{
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
+
+	RenderTools()->DrawUIRect(pRect, vec4(1.0f, 1.0f, 1.0f, 0.5f+(*pFade/Seconds)*0.25f), Corners, 5.0f);
+
+	CUIRect Image;
+	pRect->HMargin(2.0f, &Image);
+	pRect->VMargin((Image.w-Image.h)/2.0f, &Image);
+
+	Graphics()->TextureSet(g_pData->m_aImages[ImageID].m_Id);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.5f);
+	RenderTools()->SelectSprite(SpriteID);
+	IGraphics::CQuadItem QuadItem(Image.x, Image.y, Image.w, Image.h);
+	Graphics()->QuadsDrawTL(&QuadItem, 1);
+	Graphics()->QuadsEnd();
+
+	return UI()->DoButtonLogic(pID, "", false, pRect);
 }
 
 int CMenus::DoButton_CheckBox_Common(const void *pID, const char *pText, const char *pBoxText, const CUIRect *pRect)
@@ -162,9 +264,12 @@ int CMenus::DoButton_CheckBox_Common(const void *pID, const char *pText, const c
 	t.x += c.w;
 	t.w -= c.w;
 	t.VSplitLeft(5.0f, 0, &t);
+	
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
 
 	c.Margin(2.0f, &c);
-	RenderTools()->DrawUIRect(&c, vec4(1,1,1,0.25f)*ButtonColorMul(pID), CUI::CORNER_ALL, 3.0f);
+	RenderTools()->DrawUIRect(&c, vec4(1.0f , 1.0f, 1.0f, 0.25f+(*pFade/Seconds)*0.125f), CUI::CORNER_ALL, 3.0f);
 	c.y += 2;
 	UI()->DoLabel(&c, pBoxText, pRect->h*ms_FontmodHeight*0.6f, 0);
 	UI()->DoLabel(&t, pText, pRect->h*ms_FontmodHeight*0.8f, -1);
@@ -182,6 +287,55 @@ int CMenus::DoButton_CheckBox_Number(const void *pID, const char *pText, int Che
 	char aBuf[16];
 	str_format(aBuf, sizeof(aBuf), "%d", Checked);
 	return DoButton_CheckBox_Common(pID, pText, aBuf, pRect);
+}
+
+int CMenus::DoButton_SpriteClean(int ImageID, int SpriteID, const CUIRect *pRect)
+{
+	int Inside = UI()->MouseInside(pRect);
+
+	Graphics()->TextureSet(g_pData->m_aImages[ImageID].m_Id);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Inside ? 1.0f : 0.6f);
+	RenderTools()->SelectSprite(SpriteID);
+	IGraphics::CQuadItem QuadItem(pRect->x, pRect->y, pRect->w, pRect->h);
+	Graphics()->QuadsDrawTL(&QuadItem, 1);
+	Graphics()->QuadsEnd();
+
+	int ReturnValue = 0;
+	if(Inside && Input()->KeyDown(KEY_MOUSE_1))
+		ReturnValue = 1;
+
+	return ReturnValue;
+}
+
+int CMenus::DoButton_SpriteCleanID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect)
+{
+	int Inside = UI()->MouseInside(pRect);
+
+	Graphics()->TextureSet(g_pData->m_aImages[ImageID].m_Id);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Inside ? 1.0f : 0.6f);
+	RenderTools()->SelectSprite(SpriteID);
+	IGraphics::CQuadItem QuadItem(pRect->x, pRect->y, pRect->w, pRect->h);
+	Graphics()->QuadsDrawTL(&QuadItem, 1);
+	Graphics()->QuadsEnd();
+
+	return UI()->DoButtonLogic(pID, 0, 0, pRect);
+}
+
+int CMenus::DoButton_MouseOver(int ImageID, int SpriteID, const CUIRect *pRect)
+{
+	int Inside = UI()->MouseInside(pRect);
+
+	Graphics()->TextureSet(g_pData->m_aImages[ImageID].m_Id);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Inside ? 1.0f : 0.6f);
+	RenderTools()->SelectSprite(SpriteID);
+	IGraphics::CQuadItem QuadItem(pRect->x, pRect->y, pRect->w, pRect->h);
+	Graphics()->QuadsDrawTL(&QuadItem, 1);
+	Graphics()->QuadsEnd();
+
+	return Inside;
 }
 
 int CMenus::DoEditBox(void *pID, const CUIRect *pRect, char *pStr, unsigned StrSize, float FontSize, float *Offset, bool Hidden, int Corners)
@@ -382,7 +536,11 @@ float CMenus::DoScrollbarV(const void *pID, const CUIRect *pRect, float Current)
 
 	Slider = Handle;
 	Slider.Margin(5.0f, &Slider);
-	RenderTools()->DrawUIRect(&Slider, vec4(1,1,1,0.25f)*ButtonColorMul(pID), CUI::CORNER_ALL, 2.5f);
+
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
+
+	RenderTools()->DrawUIRect(&Slider, vec4(1.0f , 1.0f, 1.0f, 0.25f+(*pFade/Seconds)*0.125f), CUI::CORNER_ALL, 2.5f);
 
 	return ReturnValue;
 }
@@ -438,7 +596,11 @@ float CMenus::DoScrollbarH(const void *pID, const CUIRect *pRect, float Current)
 
 	Slider = Handle;
 	Slider.Margin(5.0f, &Slider);
-	RenderTools()->DrawUIRect(&Slider, vec4(1,1,1,0.25f)*ButtonColorMul(pID), CUI::CORNER_ALL, 2.5f);
+
+	float Seconds = 0.6f; //  0.6 seconds for fade
+	float *pFade = ButtonFade(pID, Seconds);
+
+	RenderTools()->DrawUIRect(&Slider, vec4(1.0f , 1.0f, 1.0f, 0.25f+(*pFade/Seconds)*0.125f), CUI::CORNER_ALL, 2.5f);
 
 	return ReturnValue;
 }
@@ -517,7 +679,7 @@ int CMenus::RenderMenubar(CUIRect r)
 	CUIRect Box = r;
 	CUIRect Button;
 
-	m_ActivePage = g_Config.m_UiPage;
+	m_ActivePage = m_MenuPage;
 	int NewPage = -1;
 
 	if(Client()->State() != IClient::STATE_OFFLINE)
@@ -525,7 +687,7 @@ int CMenus::RenderMenubar(CUIRect r)
 
 	if(Client()->State() == IClient::STATE_OFFLINE)
 	{
-		// offline menus
+		/*/ offline menus
 		if(0) // this is not done yet
 		{
 			Box.VSplitLeft(90.0f, &Button, &Box);
@@ -537,8 +699,9 @@ int CMenus::RenderMenubar(CUIRect r)
 
 		Box.VSplitLeft(100.0f, &Button, &Box);
 		static int s_InternetButton=0;
-		if(DoButton_MenuTab(&s_InternetButton, Localize("Internet"), m_ActivePage==PAGE_INTERNET, &Button, CUI::CORNER_TL) && m_ActivePage!=PAGE_INTERNET)
+		if(DoButton_MenuTab(&s_InternetButton, Localize("Internet"), m_ActivePage==PAGE_INTERNET, &Button, CUI::CORNER_TL|CUI::CORNER_IBL) && m_ActivePage!=PAGE_INTERNET)
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_INTERNET);
 			ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
 			NewPage = PAGE_INTERNET;
 		}
@@ -548,6 +711,7 @@ int CMenus::RenderMenubar(CUIRect r)
 		static int s_LanButton=0;
 		if(DoButton_MenuTab(&s_LanButton, Localize("LAN"), m_ActivePage==PAGE_LAN, &Button, 0) && m_ActivePage!=PAGE_LAN)
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_LAN);
 			ServerBrowser()->Refresh(IServerBrowser::TYPE_LAN);
 			NewPage = PAGE_LAN;
 		}
@@ -557,6 +721,7 @@ int CMenus::RenderMenubar(CUIRect r)
 		static int s_FavoritesButton=0;
 		if(DoButton_MenuTab(&s_FavoritesButton, Localize("Favorites"), m_ActivePage==PAGE_FAVORITES, &Button, CUI::CORNER_TR) && m_ActivePage!=PAGE_FAVORITES)
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_FAVORITES);
 			ServerBrowser()->Refresh(IServerBrowser::TYPE_FAVORITES);
 			NewPage = PAGE_FAVORITES;
 		}
@@ -566,65 +731,184 @@ int CMenus::RenderMenubar(CUIRect r)
 		static int s_DemosButton=0;
 		if(DoButton_MenuTab(&s_DemosButton, Localize("Demos"), m_ActivePage==PAGE_DEMOS, &Button, CUI::CORNER_T) && m_ActivePage!=PAGE_DEMOS)
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_DEMOS);
 			DemolistPopulate();
 			NewPage = PAGE_DEMOS;
+		}*/
+
+		// render menu tabs
+		if(m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FRIENDS)
+		{
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_InternetButton=0;
+			if(DoButton_MenuTabTop(&s_InternetButton, Localize("Internet"), m_ActivePage==PAGE_INTERNET, &Button, CUI::CORNER_T|CUI::CORNER_IBL) && m_ActivePage!=PAGE_INTERNET)
+			{
+				m_pClient->m_pCamera->ChangePosition(CCamera::POS_INTERNET);
+				ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
+				NewPage = PAGE_INTERNET;
+				g_Config.m_UiBrowserPage = PAGE_INTERNET;
+			}
+
+			//Box.VSplitLeft(4.0f, 0, &Box);
+			Box.VSplitLeft(80.0f, &Button, &Box);
+			static int s_LanButton=0;
+			if(DoButton_MenuTabTop(&s_LanButton, Localize("LAN"), m_ActivePage==PAGE_LAN, &Button, CUI::CORNER_T) && m_ActivePage!=PAGE_LAN)
+			{
+				m_pClient->m_pCamera->ChangePosition(CCamera::POS_LAN);
+				ServerBrowser()->Refresh(IServerBrowser::TYPE_LAN);
+				NewPage = PAGE_LAN;
+				g_Config.m_UiBrowserPage = PAGE_LAN;
+			}
 		}
+		else if(m_MenuPage == PAGE_SETTINGS)
+		{
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_GeneralButton=0;
+			if(DoButton_MenuTabTop(&s_GeneralButton, Localize("General"), g_Config.m_UiSettingsPage==SETTINGS_GENERAL, &Button, CUI::CORNER_T|CUI::CORNER_IBL))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_PlayerButton=0;
+			if(DoButton_MenuTabTop(&s_PlayerButton, Localize("Player"), g_Config.m_UiSettingsPage==SETTINGS_PLAYER, &Button, CUI::CORNER_T))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_PLAYER;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_TeeButton=0;
+			if(DoButton_MenuTabTop(&s_TeeButton, Localize("Tee"), g_Config.m_UiSettingsPage==SETTINGS_TEE, &Button, CUI::CORNER_T))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_TEE;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_ControlsButton=0;
+			if(DoButton_MenuTabTop(&s_ControlsButton, Localize("Controls"), g_Config.m_UiSettingsPage==SETTINGS_CONTROLS, &Button, CUI::CORNER_T))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_CONTROLS;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_GraphicsButton=0;
+			if(DoButton_MenuTabTop(&s_GraphicsButton, Localize("Graphics"), g_Config.m_UiSettingsPage==SETTINGS_GRAPHICS, &Button, CUI::CORNER_T))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_GRAPHICS;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_SoundButton=0;
+			if(DoButton_MenuTabTop(&s_SoundButton, Localize("Sound"), g_Config.m_UiSettingsPage==SETTINGS_SOUND, &Button, CUI::CORNER_T))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_SOUND;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_RaceButton=0;
+			if(DoButton_MenuTabTop(&s_RaceButton, Localize("Race"), g_Config.m_UiSettingsPage==SETTINGS_RACE, &Button, CUI::CORNER_T))
+			{
+				g_Config.m_UiSettingsPage = SETTINGS_RACE;
+			}
+		}
+
+		// back to menu
+		Box.VSplitRight(90.0f, &Box, &Button);
+		static int s_MenuButton=0;
+		if(DoButton_Menu(&s_MenuButton, Localize("Menu"), 0, &Button, 12.0f, 0.0f, CUI::CORNER_T|CUI::CORNER_IBR))
+			NewPage = PAGE_START;
 	}
 	else
 	{
 		// online menus
-		Box.VSplitLeft(85.0f, &Button, &Box);
-		static int s_GameButton=0;
-		if(DoButton_MenuTab(&s_GameButton, Localize("Game"), m_ActivePage==PAGE_GAME, &Button, CUI::CORNER_TL))
-			NewPage = PAGE_GAME;
-
-		Box.VSplitLeft(90.0f, &Button, &Box);
-		static int s_PlayersButton=0;
-		if(DoButton_MenuTab(&s_PlayersButton, Localize("Players"), m_ActivePage==PAGE_PLAYERS, &Button, 0))
-			NewPage = PAGE_PLAYERS;
-
-		Box.VSplitLeft(120.0f, &Button, &Box);
-		static int s_ServerInfoButton=0;
-		if(DoButton_MenuTab(&s_ServerInfoButton, Localize("Server info"), m_ActivePage==PAGE_SERVER_INFO, &Button, 0))
-			NewPage = PAGE_SERVER_INFO;
-
-		if(m_pClient->m_IsRace)
+		if(m_GamePage != PAGE_SETTINGS) // Game stuff
 		{
-			Box.VSplitLeft(65.0f, &Button, &Box);
-			static int s_GhostButton=0;
-			if(DoButton_MenuTab(&s_GhostButton, Localize("Ghost"), m_ActivePage==PAGE_GHOST, &Button, 0))
-				NewPage = PAGE_GHOST;
+			Box.VSplitLeft(85.0f, &Button, &Box);
+			static int s_GameButton=0;
+			if(DoButton_MenuTab(&s_GameButton, Localize("Game"), m_ActivePage==PAGE_GAME, &Button, CUI::CORNER_TL|CUI::CORNER_IBL))
+				NewPage = PAGE_GAME;
+
+			Box.VSplitLeft(90.0f, &Button, &Box);
+			static int s_PlayersButton=0;
+			if(DoButton_MenuTab(&s_PlayersButton, Localize("Players"), m_ActivePage==PAGE_PLAYERS, &Button, 0))
+				NewPage = PAGE_PLAYERS;
+
+			Box.VSplitLeft(120.0f, &Button, &Box);
+			static int s_ServerInfoButton=0;
+			if(DoButton_MenuTab(&s_ServerInfoButton, Localize("Server info"), m_ActivePage==PAGE_SERVER_INFO, &Button, 0))
+				NewPage = PAGE_SERVER_INFO;
+
+			if(m_pClient->m_IsRace)
+			{
+				Box.VSplitLeft(65.0f, &Button, &Box);
+				static int s_GhostButton=0;
+				if(DoButton_MenuTab(&s_GhostButton, Localize("Ghost"), m_ActivePage==PAGE_GHOST, &Button, 0))
+					NewPage = PAGE_GHOST;
+			}
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_CallVoteButton=0;
+			if(DoButton_MenuTab(&s_CallVoteButton, Localize("Call vote"), m_ActivePage==PAGE_CALLVOTE, &Button, CUI::CORNER_TR))
+				NewPage = PAGE_CALLVOTE;
+
+			Box.VSplitRight(90.0f, &Box, &Button);
+			static int s_QuitButton=0;
+			if(DoButton_MenuTab(&s_QuitButton, Localize("Quit"), 0, &Button, CUI::CORNER_TR|CUI::CORNER_IBR))
+				m_Popup = POPUP_QUIT;
+
+			Box.VSplitRight(130.0f, &Box, &Button);
+			static int s_SettingsButton=0;
+			if(DoButton_MenuTab(&s_SettingsButton, Localize("Settings"), 0, &Button, CUI::CORNER_TL))
+				NewPage = PAGE_SETTINGS;
 		}
-		
-		Box.VSplitLeft(100.0f, &Button, &Box);
-		static int s_CallVoteButton=0;
-		if(DoButton_MenuTab(&s_CallVoteButton, Localize("Call vote"), m_ActivePage==PAGE_CALLVOTE, &Button, CUI::CORNER_TR))
-			NewPage = PAGE_CALLVOTE;
+		else // settings menu
+		{
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_InGameGeneralButton=0;
+			if(DoButton_MenuTab(&s_InGameGeneralButton, Localize("General"), g_Config.m_UiSettingsPage==SETTINGS_GENERAL, &Button, CUI::CORNER_TL|CUI::CORNER_IBL))
+				g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+
+			Box.VSplitLeft(90.0f, &Button, &Box);
+			static int s_InGamePlayerButton=0;
+			if(DoButton_MenuTab(&s_InGamePlayerButton, Localize("Players"), g_Config.m_UiSettingsPage==SETTINGS_PLAYER, &Button, 0))
+				g_Config.m_UiSettingsPage = SETTINGS_PLAYER;
+
+			Box.VSplitLeft(60.0f, &Button, &Box);
+			static int s_InGameTeeButton=0;
+			if(DoButton_MenuTab(&s_InGameTeeButton, Localize("Tee"), g_Config.m_UiSettingsPage==SETTINGS_TEE, &Button, 0))
+				g_Config.m_UiSettingsPage = SETTINGS_TEE;
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_InGameControlsButton=0;
+			if(DoButton_MenuTab(&s_InGameControlsButton, Localize("Controls"), g_Config.m_UiSettingsPage==SETTINGS_CONTROLS, &Button, 0))
+				g_Config.m_UiSettingsPage = SETTINGS_CONTROLS;
+
+			Box.VSplitLeft(100.0f, &Button, &Box);
+			static int s_InGameGraphicsButton=0;
+			if(DoButton_MenuTab(&s_InGameGraphicsButton, Localize("Graphics"), g_Config.m_UiSettingsPage==SETTINGS_GRAPHICS, &Button, 0))
+				g_Config.m_UiSettingsPage = SETTINGS_GRAPHICS;
+
+			Box.VSplitLeft(90.0f, &Button, &Box);
+			static int s_InGameSoundButton=0;
+			if(DoButton_MenuTab(&s_InGameSoundButton, Localize("Sound"), g_Config.m_UiSettingsPage==SETTINGS_SOUND, &Button, CUI::CORNER_TR))
+				g_Config.m_UiSettingsPage = SETTINGS_SOUND;
+
+			Box.VSplitLeft(60.0f, &Button, &Box);
+			static int s_InGameRaceButton=0;
+			if(DoButton_MenuTab(&s_InGameRaceButton, Localize("Race"), g_Config.m_UiSettingsPage==SETTINGS_RACE, &Button, CUI::CORNER_TR))
+				g_Config.m_UiSettingsPage = SETTINGS_RACE;
+
+			Box.VSplitRight(90.0f, &Box, &Button);
+			static int s_InGameMenuButton=0;
+			if(DoButton_MenuTab(&s_InGameMenuButton, Localize("Back"), 0, &Button, CUI::CORNER_T|CUI::CORNER_IBR))
+				NewPage = PAGE_GAME;
+		}
 	}
-
-	/*
-	box.VSplitRight(110.0f, &box, &button);
-	static int system_button=0;
-	if (UI()->DoButton(&system_button, "System", g_Config.m_UiPage==PAGE_SYSTEM, &button))
-		g_Config.m_UiPage = PAGE_SYSTEM;
-
-	box.VSplitRight(30.0f, &box, 0);
-	*/
-
-	Box.VSplitRight(90.0f, &Box, &Button);
-	static int s_QuitButton=0;
-	if(DoButton_MenuTab(&s_QuitButton, Localize("Quit"), 0, &Button, CUI::CORNER_TR))
-		m_Popup = POPUP_QUIT;
-
-	Box.VSplitRight(130.0f, &Box, &Button);
-	static int s_SettingsButton=0;
-	if(DoButton_MenuTab(&s_SettingsButton, Localize("Settings"), m_ActivePage==PAGE_SETTINGS, &Button, CUI::CORNER_TL))
-		NewPage = PAGE_SETTINGS;
 
 	if(NewPage != -1)
 	{
 		if(Client()->State() == IClient::STATE_OFFLINE)
-			g_Config.m_UiPage = NewPage;
+			m_MenuPage = NewPage;
 		else
 			m_GamePage = NewPage;
 	}
@@ -692,8 +976,104 @@ void CMenus::RenderNews(CUIRect MainView)
 	RenderTools()->DrawUIRect(&MainView, ms_ColorTabbarActive, CUI::CORNER_ALL, 10.0f);
 }
 
+int CMenus::MenuImageScan(const char *pName, int IsDir, int DirType, void *pUser)
+{
+	CMenus *pSelf = (CMenus *)pUser;
+	int l = str_length(pName);
+	if(l < 4 || IsDir || str_comp(pName+l-4, ".png") != 0)
+		return 0;
+
+	char aBuf[512];
+	str_format(aBuf, sizeof(aBuf), "menuimages/%s", pName);
+	CImageInfo Info;
+	if(!pSelf->Graphics()->LoadPNG(&Info, aBuf, DirType))
+	{
+		str_format(aBuf, sizeof(aBuf), "failed to load menu image from %s", pName);
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "game", aBuf);
+		return 0;
+	}
+
+	CMenuImage MenuImage;
+	MenuImage.m_OrgTexture = pSelf->Graphics()->LoadTextureRaw(Info.m_Width, Info.m_Height, Info.m_Format, Info.m_pData, Info.m_Format, 0);
+
+	unsigned char *d = (unsigned char *)Info.m_pData;
+	//int Pitch = Info.m_Width*4;
+
+	// create colorless version
+	int Step = Info.m_Format == CImageInfo::FORMAT_RGBA ? 4 : 3;
+
+	// make the texture gray scale
+	for(int i = 0; i < Info.m_Width*Info.m_Height; i++)
+	{
+		int v = (d[i*Step]+d[i*Step+1]+d[i*Step+2])/3;
+		d[i*Step] = v;
+		d[i*Step+1] = v;
+		d[i*Step+2] = v;
+	}
+
+	/* same grey like sinks
+	int Freq[256] = {0};
+	int OrgWeight = 0;
+	int NewWeight = 192;
+
+	// find most common frequence
+	for(int y = 0; y < Info.m_Height; y++)
+		for(int x = 0; x < Info.m_Width; x++)
+		{
+			if(d[y*Pitch+x*4+3] > 128)
+				Freq[d[y*Pitch+x*4]]++;
+		}
+
+	for(int i = 1; i < 256; i++)
+	{
+		if(Freq[OrgWeight] < Freq[i])
+			OrgWeight = i;
+	}
+
+	// reorder
+	int InvOrgWeight = 255-OrgWeight;
+	int InvNewWeight = 255-NewWeight;
+	for(int y = 0; y < Info.m_Height; y++)
+		for(int x = 0; x < Info.m_Width; x++)
+		{
+			int v = d[y*Pitch+x*4];
+			if(v <= OrgWeight)
+				v = (int)(((v/(float)OrgWeight) * NewWeight));
+			else
+				v = (int)(((v-OrgWeight)/(float)InvOrgWeight)*InvNewWeight + NewWeight);
+			d[y*Pitch+x*4] = v;
+			d[y*Pitch+x*4+1] = v;
+			d[y*Pitch+x*4+2] = v;
+		}
+	*/
+
+	MenuImage.m_GreyTexture = pSelf->Graphics()->LoadTextureRaw(Info.m_Width, Info.m_Height, Info.m_Format, Info.m_pData, Info.m_Format, 0);
+	mem_free(Info.m_pData);
+
+	// set menu image data
+	str_copy(MenuImage.m_aName, pName, min((int)sizeof(MenuImage.m_aName),l-3));
+	str_format(aBuf, sizeof(aBuf), "load menu image %s", MenuImage.m_aName);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "game", aBuf);
+	pSelf->m_lMenuImages.add(MenuImage);
+
+	return 0;
+}
+
+const CMenus::CMenuImage *CMenus::FindMenuImage(const char *pName)
+{
+	for(int i = 0; i < m_lMenuImages.size(); i++)
+	{
+		if(str_comp(m_lMenuImages[i].m_aName, pName) == 0)
+			return &m_lMenuImages[i];
+	}
+	return 0;
+}
+
 void CMenus::OnInit()
 {
+	// load menu images
+	m_lMenuImages.clear();
+	Storage()->ListDirectory(IStorage::TYPE_ALL, "menuimages", MenuImageScan, this);
 
 	/*
 	array<string> my_strings;
@@ -738,6 +1118,9 @@ void CMenus::OnInit()
 	exit(-1);
 	// */
 
+	// clear filter lists
+	//m_lFilters.clear();
+
 	if(g_Config.m_ClShowWelcome)
 		m_Popup = POPUP_LANGUAGE;
 	g_Config.m_ClShowWelcome = 0;
@@ -774,17 +1157,18 @@ int CMenus::Render()
 	static bool s_First = true;
 	if(s_First)
 	{
-		if(g_Config.m_UiPage == PAGE_INTERNET)
-			ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
-		else if(g_Config.m_UiPage == PAGE_LAN)
+		// refresh server browser before we are in browser menu to save time
+		m_pClient->m_pCamera->ChangePosition(CCamera::POS_START);
+		if(g_Config.m_UiBrowserPage == PAGE_LAN)
 			ServerBrowser()->Refresh(IServerBrowser::TYPE_LAN);
-		else if(g_Config.m_UiPage == PAGE_FAVORITES)
-			ServerBrowser()->Refresh(IServerBrowser::TYPE_FAVORITES);
+		else
+			ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
+
 		m_pClient->m_pSounds->Enqueue(CSounds::CHN_MUSIC, SOUND_MENU);
 		s_First = false;
 	}
 
-	if(Client()->State() == IClient::STATE_ONLINE)
+	if(Client()->State() == IClient::STATE_ONLINE || m_pClient->m_pMapLayersBackGround->MenuMapLoaded())
 	{
 		ms_ColorTabbarInactive = ms_ColorTabbarInactiveIngame;
 		ms_ColorTabbarActive = ms_ColorTabbarActiveIngame;
@@ -812,46 +1196,65 @@ int CMenus::Render()
 
 	if(m_Popup == POPUP_NONE)
 	{
-		// do tab bar
-		Screen.HSplitTop(24.0f, &TabBar, &MainView);
-		TabBar.VMargin(20.0f, &TabBar);
-		RenderMenubar(TabBar);
-
-		// news is not implemented yet
-		if(g_Config.m_UiPage <= PAGE_NEWS || g_Config.m_UiPage > PAGE_SETTINGS || (Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiPage >= PAGE_GAME && g_Config.m_UiPage <= PAGE_CALLVOTE))
+		if(m_MenuPage == PAGE_START && Client()->State() == IClient::STATE_OFFLINE)
 		{
-			ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
-			g_Config.m_UiPage = PAGE_INTERNET;
+			RenderLogo(Screen);
+			RenderStartMenu(Screen);
+		}
+		else
+		{
+			// do tab bar
+			Screen.VMargin(Screen.w/2-365.0f, &MainView);
+			MainView.HMargin(20.0f, &MainView);
+			MainView.HSplitTop(24.0f, &TabBar, &MainView);
+			RenderMenubar(TabBar);
+
+			// news is not implemented yet
+			/*if(m_MenuPage <= PAGE_NEWS || m_MenuPage > PAGE_SETTINGS || (Client()->State() == IClient::STATE_OFFLINE && m_MenuPage >= PAGE_GAME && m_MenuPage <= PAGE_CALLVOTE))
+			{
+				ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
+				m_MenuPage = PAGE_INTERNET;
+			}*/
+
+			// render current page
+			if(Client()->State() != IClient::STATE_OFFLINE)
+			{
+				if(m_GamePage == PAGE_GAME)
+					RenderGame(MainView);
+				else if(m_GamePage == PAGE_PLAYERS)
+					RenderPlayers(MainView);
+				else if(m_GamePage == PAGE_SERVER_INFO)
+					RenderServerInfo(MainView);
+				else if(m_GamePage == PAGE_GHOST)
+					RenderGhost(MainView);
+				else if(m_GamePage == PAGE_CALLVOTE)
+					RenderServerControl(MainView);
+				else if(m_GamePage == PAGE_SETTINGS)
+					RenderSettings(MainView);
+			}
+			else
+			{
+				if(m_MenuPage == PAGE_NEWS)
+					RenderNews(MainView);
+				else if(m_MenuPage == PAGE_INTERNET)
+					RenderServerbrowser(MainView);
+				else if(m_MenuPage == PAGE_LAN)
+					RenderServerbrowser(MainView);
+				else if(m_MenuPage == PAGE_DEMOS)
+					RenderDemoList(MainView);
+				else if(m_MenuPage == PAGE_FRIENDS)
+					RenderServerbrowser(MainView);
+				else if(m_MenuPage == PAGE_SETTINGS)
+					RenderSettings(MainView);
+
+				// handle back with esc
+				if(m_EscapePressed)
+					m_MenuPage = PAGE_START;
+			}
 		}
 
-		// render current page
-		if(Client()->State() != IClient::STATE_OFFLINE)
-		{
-			if(m_GamePage == PAGE_GAME)
-				RenderGame(MainView);
-			else if(m_GamePage == PAGE_PLAYERS)
-				RenderPlayers(MainView);
-			else if(m_GamePage == PAGE_SERVER_INFO)
-				RenderServerInfo(MainView);
-			else if(m_GamePage == PAGE_GHOST)
-				RenderGhost(MainView);
-			else if(m_GamePage == PAGE_CALLVOTE)
-				RenderServerControl(MainView);
-			else if(m_GamePage == PAGE_SETTINGS)
-				RenderSettings(MainView);
-		}
-		else if(g_Config.m_UiPage == PAGE_NEWS)
-			RenderNews(MainView);
-		else if(g_Config.m_UiPage == PAGE_INTERNET)
-			RenderServerbrowser(MainView);
-		else if(g_Config.m_UiPage == PAGE_LAN)
-			RenderServerbrowser(MainView);
-		else if(g_Config.m_UiPage == PAGE_DEMOS)
-			RenderDemoList(MainView);
-		else if(g_Config.m_UiPage == PAGE_FAVORITES)
-			RenderServerbrowser(MainView);
-		else if(g_Config.m_UiPage == PAGE_SETTINGS)
-			RenderSettings(MainView);
+		// do overlay popups
+		DoPopupMenu();
 	}
 	else
 	{
@@ -869,6 +1272,7 @@ int CMenus::Render()
 			pTitle = m_aMessageTopic;
 			pExtraText = m_aMessageBody;
 			pButtonText = m_aMessageButton;
+			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_CONNECTING)
 		{
@@ -911,6 +1315,12 @@ int CMenus::Render()
 		{
 			pTitle = Localize("Remove friend");
 			pExtraText = Localize("Are you sure that you want to remove the player from your friends list?");
+			ExtraAlign = -1;
+		}
+		else if(m_Popup == POPUP_SAVE_SKIN)
+		{
+			pTitle = Localize("Save skin");
+			pExtraText = Localize("Are you sure you want to save your skin ? If a skin with this name already exists, it will be replaced.");
 			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_SOUNDERROR)
@@ -1119,9 +1529,18 @@ int CMenus::Render()
 			Box.HSplitBottom(20.f, &Box, 0);
 			Box.VMargin(20.0f, &Box);
 
+			// selected filter
+			CBrowserFilter *pFilter = &m_lFilters[m_SelectedFilter];
+			int SortHash = 0;
+			int Ping = 0;
+			int Country = 0;
+			char aGametype[32];
+			char aServerAddress[16];
+			pFilter->GetFilter(&SortHash, &Ping, &Country, aGametype, aServerAddress);
+
 			static int ActSelection = -2;
 			if(ActSelection == -2)
-				ActSelection = g_Config.m_BrFilterCountryIndex;
+				ActSelection = Country;
 			static float s_ScrollValue = 0.0f;
 			int OldSelected = -1;
 			UiDoListboxStart(&s_ScrollValue, &Box, 50.0f, Localize("Country"), "", m_pClient->m_pCountryFlags->Num(), 6, OldSelected, s_ScrollValue);
@@ -1156,14 +1575,13 @@ int CMenus::Render()
 			static int s_Button = 0;
 			if(DoButton_Menu(&s_Button, Localize("Ok"), 0, &Part) || m_EnterPressed)
 			{
-				g_Config.m_BrFilterCountryIndex = ActSelection;
-				Client()->ServerBrowserUpdate();
+				pFilter->SetFilter(SortHash, Ping, ActSelection, aGametype, aServerAddress);
 				m_Popup = POPUP_NONE;
 			}
 
 			if(m_EscapePressed)
 			{
-				ActSelection = g_Config.m_BrFilterCountryIndex;
+				ActSelection = Country;
 				m_Popup = POPUP_NONE;
 			}
 		}
@@ -1285,6 +1703,30 @@ int CMenus::Render()
 				}
 			}
 		}
+		else if(m_Popup == POPUP_SAVE_SKIN)
+		{
+			CUIRect Yes, No;
+			Box.HSplitBottom(20.f, &Box, &Part);
+			Box.HSplitBottom(24.f, &Box, &Part);
+			Part.VMargin(80.0f, &Part);
+
+			Part.VSplitMid(&No, &Yes);
+
+			Yes.VMargin(20.0f, &Yes);
+			No.VMargin(20.0f, &No);
+
+			static int s_ButtonAbort = 0;
+			if(DoButton_Menu(&s_ButtonAbort, Localize("No"), 0, &No) || m_EscapePressed)
+				m_Popup = POPUP_NONE;
+
+			static int s_ButtonTryAgain = 0;
+			if(DoButton_Menu(&s_ButtonTryAgain, Localize("Yes"), 0, &Yes) || m_EnterPressed)
+			{
+				m_Popup = POPUP_NONE;
+				SaveSkinfile();
+				m_aSaveSkinName[0] = 0;
+			}
+		}
 		else if(m_Popup == POPUP_FIRST_LAUNCH)
 		{
 			CUIRect Label, TextBox;
@@ -1329,12 +1771,6 @@ void CMenus::SetActive(bool Active)
 	m_MenuActive = Active;
 	if(!m_MenuActive)
 	{
-		if(m_NeedSendinfo)
-		{
-			m_pClient->SendInfo(false);
-			m_NeedSendinfo = false;
-		}
-
 		if(Client()->State() == IClient::STATE_ONLINE)
 		{
 			m_pClient->OnRelease();
@@ -1400,6 +1836,14 @@ bool CMenus::OnInput(IInput::CEvent e)
 		return true;
 	}
 	return false;
+}
+
+void CMenus::OnConsoleInit()
+{
+	// add filters
+	m_lFilters.add(CBrowserFilter(CBrowserFilter::FILTER_ALL, Localize("All"), ServerBrowser(), IServerBrowser::FILTER_PING, 999, -1, "", ""));
+	m_lFilters.add(CBrowserFilter(CBrowserFilter::FILTER_STANDARD, Localize("Standard Gametype"), ServerBrowser(), IServerBrowser::FILTER_COMPAT_VERSION|IServerBrowser::FILTER_PURE|IServerBrowser::FILTER_PURE_MAP|IServerBrowser::FILTER_PING, 999, -1, "", ""));
+	m_lFilters.add(CBrowserFilter(CBrowserFilter::FILTER_FAVORITES, Localize("Favorites"), ServerBrowser(), IServerBrowser::FILTER_FAVORITE|IServerBrowser::FILTER_PING, 999, -1, "", ""));
 }
 
 void CMenus::OnStateChange(int NewState, int OldState)

@@ -83,10 +83,9 @@ public:
 	// TODO: clean this up
 	struct
 	{
-		char m_SkinName[64];
-		int m_UseCustomColor;
-		int m_ColorBody;
-		int m_ColorFeet;
+		char m_aaSkinPartNames[6][24];
+		int m_aUseCustomColors[6];
+		int m_aSkinPartColors[6];
 	} m_TeeInfos;
 
 	int m_RespawnTick;
@@ -95,6 +94,9 @@ public:
 	int m_ScoreStartTick;
 	int m_LastActionTick;
 	int m_TeamChangeTick;
+
+	int m_InactivityTickCounter;
+
 	struct
 	{
 		int m_TargetX;

@@ -52,30 +52,39 @@ public:
 		}
 
 		// add save directories
-		if(StorageType != STORAGETYPE_BASIC && m_NumPaths && (!m_aaStoragePaths[TYPE_SAVE][0] || !fs_makedir(m_aaStoragePaths[TYPE_SAVE])))
+		if(StorageType != STORAGETYPE_BASIC)
 		{
-			char aPath[MAX_PATH_LENGTH];
-			if(StorageType == STORAGETYPE_CLIENT)
+			if(m_NumPaths && (!m_aaStoragePaths[TYPE_SAVE][0] || !fs_makedir(m_aaStoragePaths[TYPE_SAVE])))
 			{
-				fs_makedir(GetPath(TYPE_SAVE, "screenshots", aPath, sizeof(aPath)));
-				fs_makedir(GetPath(TYPE_SAVE, "screenshots/auto", aPath, sizeof(aPath)));
+				char aPath[MAX_PATH_LENGTH];
+				if(StorageType == STORAGETYPE_CLIENT)
+				{
+					fs_makedir(GetPath(TYPE_SAVE, "screenshots", aPath, sizeof(aPath)));
+					fs_makedir(GetPath(TYPE_SAVE, "screenshots/auto", aPath, sizeof(aPath)));
+					fs_makedir(GetPath(TYPE_SAVE, "maps", aPath, sizeof(aPath)));
+					fs_makedir(GetPath(TYPE_SAVE, "downloadedmaps", aPath, sizeof(aPath)));
+					fs_makedir(GetPath(TYPE_SAVE, "skins", aPath, sizeof(aPath)));
+				}
+#if defined(CONF_TEERACE)
 				fs_makedir(GetPath(TYPE_SAVE, "maps", aPath, sizeof(aPath)));
-				fs_makedir(GetPath(TYPE_SAVE, "downloadedmaps", aPath, sizeof(aPath)));
+				fs_makedir(GetPath(TYPE_SAVE, "maps/teerace", aPath, sizeof(aPath)));
+#endif
+				fs_makedir(GetPath(TYPE_SAVE, "dumps", aPath, sizeof(aPath)));
+				fs_makedir(GetPath(TYPE_SAVE, "demos", aPath, sizeof(aPath)));
+#if defined(CONF_TEERACE)
+				fs_makedir(GetPath(TYPE_SAVE, "demos/teerace", aPath, sizeof(aPath)));
+#endif
+				fs_makedir(GetPath(TYPE_SAVE, "demos/auto", aPath, sizeof(aPath)));
+				fs_makedir(GetPath(TYPE_SAVE, "ghosts", aPath, sizeof(aPath)));
+#if defined(CONF_TEERACE)
+				fs_makedir(GetPath(TYPE_SAVE, "ghosts/teerace", aPath, sizeof(aPath)));
+#endif
 			}
-#if defined(CONF_TEERACE)
-			fs_makedir(GetPath(TYPE_SAVE, "maps", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "maps/teerace", aPath, sizeof(aPath)));
-#endif
-			fs_makedir(GetPath(TYPE_SAVE, "dumps", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "demos", aPath, sizeof(aPath)));
-#if defined(CONF_TEERACE)
-			fs_makedir(GetPath(TYPE_SAVE, "demos/teerace", aPath, sizeof(aPath)));
-#endif
-			fs_makedir(GetPath(TYPE_SAVE, "demos/auto", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "ghosts", aPath, sizeof(aPath)));
-#if defined(CONF_TEERACE)
-			fs_makedir(GetPath(TYPE_SAVE, "ghosts/teerace", aPath, sizeof(aPath)));
-#endif
+			else
+			{
+				dbg_msg("storage", "unable to create save directory");
+				return 1;
+			}
 		}
 
 		return m_NumPaths ? 0 : 1;
