@@ -101,12 +101,21 @@ protected:
 	int m_SuddenDeath;
 	int m_aTeamscore[NUM_TEAMS];
 
-	void EndMatch() { SetGameState(IGS_END_MATCH, 10); }
-	void EndRound() { SetGameState(IGS_END_ROUND, 10); }
+	void EndMatch() { SetGameState(IGS_END_MATCH, TIMER_END); }
+	void EndRound() { SetGameState(IGS_END_ROUND, TIMER_END); }
 
 	// info
 	int m_GameFlags;
 	const char *m_pGameType;
+	struct CGameInfo
+	{
+		int m_MatchCurrent;
+		int m_MatchNum;
+		int m_ScoreLimit;
+		int m_TimeLimit;
+	} m_GameInfo;
+
+	void UpdateGameInfo(int ClientID);
 
 public:
 	IGameController(class CGameContext *pGameServer);
@@ -147,7 +156,8 @@ public:
 	*/
 	virtual bool OnEntity(int Index, vec2 Pos);
 
-	void OnPlayerDisconnect(class CPlayer *pPlayer, const char *pReason);
+	void OnPlayerConnect(class CPlayer *pPlayer);
+	void OnPlayerDisconnect(class CPlayer *pPlayer);
 	void OnPlayerInfoChange(class CPlayer *pPlayer);
 	void OnPlayerReadyChange(class CPlayer *pPlayer);
 
@@ -157,6 +167,7 @@ public:
 	enum
 	{
 		TIMER_INFINITE = -1,
+		TIMER_END = 10,
 	};
 
 	void DoPause(int Seconds) { SetGameState(IGS_GAME_PAUSED, Seconds); }
@@ -188,6 +199,7 @@ public:
 	bool CanChangeTeam(CPlayer *pPplayer, int JoinTeam) const;
 
 	void DoTeamChange(class CPlayer *pPlayer, int Team, bool DoChatMsg=true);
+	void ForceTeamBalance() { if(!(m_GameFlags&GAMEFLAG_SURVIVAL)) DoTeamBalance(); }
 	
 	int GetStartTeam();
 };

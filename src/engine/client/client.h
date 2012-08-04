@@ -97,6 +97,7 @@ class CClient : public IClient, public CDemoPlayer::IListner
 	bool m_EditorActive;
 	bool m_SoundInitFailed;
 	bool m_ResortServerBrowser;
+	bool m_RecordGameMessage;
 
 	int m_AckGameTick;
 	int m_CurrentRecvTick;
@@ -156,6 +157,7 @@ class CClient : public IClient, public CDemoPlayer::IListner
 
 	class CSnapshotStorage::CHolder m_aDemorecSnapshotHolders[NUM_SNAPSHOT_TYPES];
 	char *m_aDemorecSnapshotData[NUM_SNAPSHOT_TYPES][2][CSnapshot::MAX_SIZE];
+	class CSnapshotBuilder m_DemoRecSnapshotBuilder;
 
 	class CSnapshotDelta m_SnapshotDelta;
 
@@ -180,6 +182,8 @@ class CClient : public IClient, public CDemoPlayer::IListner
 	volatile int m_GfxState;
 	static void GraphicsThreadProxy(void *pThis) { ((CClient*)pThis)->GraphicsThread(); }
 	void GraphicsThread();
+
+	int64 TickStartTime(int Tick);
 
 public:
 	IEngine *Engine() { return m_pEngine; }
@@ -243,6 +247,7 @@ public:
 	void SnapInvalidateItem(int SnapID, int Index);
 	void *SnapFindItem(int SnapID, int Type, int ID);
 	int SnapNumItems(int SnapID);
+	void *SnapNewItem(int Type, int ID, int Size);
 	void SnapSetStaticsize(int ItemType, int Size);
 
 	void Render();
@@ -252,6 +257,7 @@ public:
 
 	virtual const char *ErrorString();
 
+	bool MapLoaded();
 	const char *LoadMap(const char *pName, const char *pFilename, unsigned WantedCrc);
 	const char *LoadMapSearch(const char *pMapName, int WantedCrc);
 
@@ -299,6 +305,7 @@ public:
 	void DemoRecorder_HandleAutoStart();
 	void DemoRecorder_Stop();
 	void DemoRecorder_AddDemoMarker();
+	void RecordGameMessage(bool State) { m_RecordGameMessage = State; }
 
 	void AutoScreenshot_Start();
 	void AutoScreenshot_Cleanup();
