@@ -326,7 +326,7 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 	TextRender()->Text(0, MapInfo.x+x, MapInfo.y+y, 32, Localize("Map info"), 250);
 	y += 32.0f+5.0f;
 
-	if(m_pClient->m_Snap.m_pGameInfoObj)
+	if(m_pClient->m_Snap.m_pGameData)
 	{
 		mem_zero(aBuf, sizeof(aBuf));
 		str_format(

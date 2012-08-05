@@ -15,10 +15,9 @@ public:
 		unsigned char m_aMarker[8];
 		unsigned char m_Version;
 		char m_aOwner[MAX_NAME_LENGTH];
-		char m_aSkinName[64];
-		int m_UseCustomColor;
-		int m_ColorBody;
-		int m_ColorFeet;
+		char m_aaSkinName[6][24];
+		int m_aUseCustomColor[6];
+		int m_aColors[6];
 		char m_aMap[64];
 		unsigned char m_aCrc[4];
 		int m_NumShots;

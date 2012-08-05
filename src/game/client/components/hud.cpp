@@ -584,7 +584,7 @@ void CHud::RenderSpeedmeter()
 		Speed += SmoothTable[i];
 	Speed /= SMOOTH_TABLE_SIZE;
 
-	int GameFlags = m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_FLAGS;
+	int GameFlags = m_pClient->m_GameInfo.m_GameFlags;
 	int LastIndex = SmoothIndex - 1;
 	if(LastIndex < 0)
 		LastIndex = SMOOTH_TABLE_SIZE - 1;
@@ -602,8 +602,8 @@ void CHud::RenderSpeedmeter()
 	if(GameFlags&GAMEFLAG_TEAMS)
 	{
 		char aScoreTeam[2][32];
-		str_format(aScoreTeam[TEAM_RED], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataObj->m_TeamscoreRed);
-		str_format(aScoreTeam[TEAM_BLUE], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataObj->m_TeamscoreBlue);
+		str_format(aScoreTeam[TEAM_RED], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataTeam->m_TeamscoreRed);
+		str_format(aScoreTeam[TEAM_BLUE], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataTeam->m_TeamscoreBlue);
 		float aScoreTeamWidth[2] = {TextRender()->TextWidth(0, 14.0f, aScoreTeam[TEAM_RED], -1), TextRender()->TextWidth(0, 14.0f, aScoreTeam[TEAM_BLUE], -1)};
 		float ScoreWidthMax = max(max(aScoreTeamWidth[TEAM_RED], aScoreTeamWidth[TEAM_BLUE]), TextRender()->TextWidth(0, 14.0f, "100", -1));
 		float Split = 3.0f;
@@ -615,11 +615,11 @@ void CHud::RenderSpeedmeter()
 	{
 		const CNetObj_PlayerInfo *apPlayerInfo[2] = { 0, 0 };
 		int i = 0;
-		for(int j = 0; j < 2 && i < MAX_CLIENTS && m_pClient->m_Snap.m_paInfoByScore[i]; ++i)
+		for(int j = 0; j < 2 && i < MAX_CLIENTS && m_pClient->m_Snap.m_aInfoByScore[i].m_pPlayerInfo; ++i)
 		{
-			if(m_pClient->m_Snap.m_paInfoByScore[i]->m_Team != TEAM_SPECTATORS)
+			if(m_pClient->m_aClients[m_pClient->m_Snap.m_aInfoByScore[i].m_ClientID].m_Team != TEAM_SPECTATORS)
 			{
-				apPlayerInfo[j] = m_pClient->m_Snap.m_paInfoByScore[i];
+				apPlayerInfo[j] = m_pClient->m_Snap.m_aInfoByScore[i].m_pPlayerInfo;
 				++j;
 			}
 		}
@@ -776,7 +776,7 @@ void CHud::OnMessage(int MsgType, void *pRawMsg)
 	else if(MsgType == NETMSGTYPE_SV_KILLMSG)
 	{
 		CNetMsg_Sv_KillMsg *pMsg = (CNetMsg_Sv_KillMsg *)pRawMsg;
-		if(pMsg->m_Victim == m_pClient->m_Snap.m_LocalClientID)
+		if(pMsg->m_Victim == m_pClient->m_LocalClientID)
 		{
 			m_CheckpointTick = 0;
 			m_RaceTime = 0;
@@ -808,7 +808,7 @@ void CHud::OnMessage(int MsgType, void *pRawMsg)
 			char PlayerName[MAX_NAME_LENGTH];
 			str_copy(PlayerName, pMsg->m_pMessage, Num+1);
 			
-			if(!str_comp(PlayerName, m_pClient->m_aClients[m_pClient->m_Snap.m_LocalClientID].m_aName))
+			if(!str_comp(PlayerName, m_pClient->m_aClients[m_pClient->m_LocalClientID].m_aName))
 			{
 				int Minutes = 0;
 				float Seconds = 0.0f;

@@ -238,12 +238,12 @@ void CRenderTools::RenderTee(CAnimState *pAnim, CTeeRenderInfo *pInfo, int Emote
 				Graphics()->QuadsSetRotation(pAnim->GetBody()->m_Angle*pi*2);
 				if(OutLine)
 				{
-					Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha ? 0.5f : 1.0f);
+					Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha ? pInfo->m_aColors[0].a : 1.0f);
 					SelectSprite(SPRITE_TEE_BODY_OUTLINE, 0, 0, 0);
 				}
 				else
 				{
-					Graphics()->SetColor(pInfo->m_aColors[0].r, pInfo->m_aColors[0].g, pInfo->m_aColors[0].b, Alpha ? pInfo->m_aColors[0].a*0.5f : pInfo->m_aColors[0].a);
+					Graphics()->SetColor(pInfo->m_aColors[0].r, pInfo->m_aColors[0].g, pInfo->m_aColors[0].b, pInfo->m_aColors[0].a);
 					SelectSprite(SPRITE_TEE_BODY, 0, 0, 0);
 				}
 				Item = BodyItem;
@@ -283,7 +283,7 @@ void CRenderTools::RenderTee(CAnimState *pAnim, CTeeRenderInfo *pInfo, int Emote
 				Graphics()->TextureSet(pInfo->m_aTextures[5]);
 				Graphics()->QuadsBegin();
 				Graphics()->QuadsSetRotation(pAnim->GetBody()->m_Angle*pi*2);
-				Graphics()->SetColor(pInfo->m_aColors[5].r, pInfo->m_aColors[5].g, pInfo->m_aColors[5].b, Alpha ? pInfo->m_aColors[5].a*0.5f : pInfo->m_aColors[5].a);
+				Graphics()->SetColor(pInfo->m_aColors[5].r, pInfo->m_aColors[5].g, pInfo->m_aColors[5].b, pInfo->m_aColors[5].a);
 				if(p == 1)
 				{
 					switch (Emote)
@@ -326,7 +326,7 @@ void CRenderTools::RenderTee(CAnimState *pAnim, CTeeRenderInfo *pInfo, int Emote
 
 			if(OutLine)
 			{
-				Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha ? 0.5f : 1.0f);
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha ? pInfo->m_aColors[4].a : 1.0f);
 				SelectSprite(SPRITE_TEE_FOOT_OUTLINE, 0, 0, 0);
 			}
 			else
@@ -335,7 +335,7 @@ void CRenderTools::RenderTee(CAnimState *pAnim, CTeeRenderInfo *pInfo, int Emote
 				float cs = 1.0f; // color scale
 				if(Indicate)
 					cs = 0.5f;
-				Graphics()->SetColor(pInfo->m_aColors[4].r*cs, pInfo->m_aColors[4].g*cs, pInfo->m_aColors[4].b*cs, Alpha ? pInfo->m_aColors[4].a*0.5f : pInfo->m_aColors[4].a);
+				Graphics()->SetColor(pInfo->m_aColors[4].r*cs, pInfo->m_aColors[4].g*cs, pInfo->m_aColors[4].b*cs, pInfo->m_aColors[4].a);
 				SelectSprite(SPRITE_TEE_FOOT, 0, 0, 0);
 			}
 

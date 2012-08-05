@@ -2200,7 +2200,7 @@ const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)
 	return 0;
 }
 
-void CClient::GhostRecorder_Start(const char* pSkinName, int UseCustomColor, int ColorBody, int ColorFeet)
+void CClient::GhostRecorder_Start(char aaSkinName[6][24], int *paUseCustomColor, int *paColors)
 {
 	// check the player name
 	char aName[MAX_NAME_LENGTH];
@@ -2216,7 +2216,7 @@ void CClient::GhostRecorder_Start(const char* pSkinName, int UseCustomColor, int
 
 	char aFilename[128];
 	str_format(aFilename, sizeof(aFilename), "ghosts/%s_%s_%08x_tmp.gho", GetCurrentMap(), aName, GetCurrentMapCrc());
-	m_GhostRecorder.Start(Storage(), m_pConsole, aFilename, GetCurrentMap(), GetCurrentMapCrc(), g_Config.m_PlayerName, pSkinName, UseCustomColor, ColorBody, ColorFeet);
+	m_GhostRecorder.Start(Storage(), m_pConsole, aFilename, GetCurrentMap(), GetCurrentMapCrc(), g_Config.m_PlayerName, aaSkinName, paUseCustomColor, paColors);
 }
 
 void CClient::GhostRecorder_Stop(float Time)

@@ -167,30 +167,30 @@ void CGameControllerFC::Snap(int SnappingClient)
 {
 	IGameController::Snap(SnappingClient);
 
-	CNetObj_GameData *pGameDataObj = (CNetObj_GameData *)Server()->SnapNewItem(NETOBJTYPE_GAMEDATA, 0, sizeof(CNetObj_GameData));
-	if(!pGameDataObj)
+	CNetObj_GameDataFlag *pGameDataFlag = static_cast<CNetObj_GameDataFlag *>(Server()->SnapNewItem(NETOBJTYPE_GAMEDATAFLAG, 0, sizeof(CNetObj_GameDataFlag)));
+	if(!pGameDataFlag)
 		return;
 
-	pGameDataObj->m_TeamscoreRed = 0;
-	pGameDataObj->m_TeamscoreBlue = 0;
+	pGameDataFlag->m_FlagDropTickRed = 0;
+	pGameDataFlag->m_FlagDropTickBlue = 0;
 
 	if(m_apPlFlags[SnappingClient])
 	{
 		if(m_apPlFlags[SnappingClient]->m_Team == TEAM_RED)
 		{
-			pGameDataObj->m_FlagCarrierRed = SnappingClient;
-			pGameDataObj->m_FlagCarrierBlue = FLAG_MISSING;
+			pGameDataFlag->m_FlagCarrierRed = SnappingClient;
+			pGameDataFlag->m_FlagCarrierBlue = FLAG_MISSING;
 		}
 		else if(m_apPlFlags[SnappingClient]->m_Team == TEAM_BLUE)
 		{
-			pGameDataObj->m_FlagCarrierBlue = SnappingClient;
-			pGameDataObj->m_FlagCarrierRed = FLAG_MISSING;
+			pGameDataFlag->m_FlagCarrierBlue = SnappingClient;
+			pGameDataFlag->m_FlagCarrierRed = FLAG_MISSING;
 		}
 	}
 	else
 	{
-		pGameDataObj->m_FlagCarrierRed = FLAG_MISSING;
-		pGameDataObj->m_FlagCarrierBlue = FLAG_MISSING;
+		pGameDataFlag->m_FlagCarrierRed = FLAG_MISSING;
+		pGameDataFlag->m_FlagCarrierBlue = FLAG_MISSING;
 	}
 		
 }

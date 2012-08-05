@@ -58,7 +58,7 @@ void CGhost::OnRender()
 		return;
 
 	// Check if the race line is crossed then start the render of the ghost if one
-	int EnemyTeam = m_pClient->m_aClients[m_pClient->m_Snap.m_LocalClientID].m_Team^1;
+	int EnemyTeam = m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team^1;
 	if(m_RaceState != RACE_STARTED && ((m_pClient->Collision()->GetCollisionRace(m_pClient->Collision()->GetIndex(m_pClient->m_PredictedPrevChar.m_Pos, m_pClient->m_LocalCharacterPos)) == TILE_BEGIN) ||
 		(m_pClient->m_IsFastCap && m_pClient->m_aFlagPos[EnemyTeam] != vec2(-1, -1) && distance(m_pClient->m_LocalCharacterPos, m_pClient->m_aFlagPos[EnemyTeam]) < 32)))
 	{
@@ -90,7 +90,7 @@ void CGhost::OnRender()
 		OnReset();
 	}
 
-	CNetObj_Character Char = m_pClient->m_Snap.m_aCharacters[m_pClient->m_Snap.m_LocalClientID].m_Cur;
+	CNetObj_Character Char = m_pClient->m_Snap.m_aCharacters[m_pClient->m_LocalClientID].m_Cur;
 	m_pClient->m_PredictedChar.Write(&Char);
 
 	if(m_pClient->m_NewPredictedTick)
@@ -117,7 +117,7 @@ void CGhost::OnRender()
 		int PrevPos = (m_CurPos > 0) ? m_CurPos-1 : m_CurPos;
 		IGhostRecorder::CGhostCharacter Player = pGhost->m_Path[m_CurPos];
 		IGhostRecorder::CGhostCharacter Prev = pGhost->m_Path[PrevPos];
-		CNetObj_ClientInfo Info = pGhost->m_Info;
+		CNetObj_De_ClientInfo Info = pGhost->m_Info;
 
 		RenderGhostHook(Player, Prev);
 		RenderGhost(Player, Prev, Info);
@@ -125,34 +125,48 @@ void CGhost::OnRender()
 	}
 }
 
-void CGhost::RenderGhost(IGhostRecorder::CGhostCharacter Player, IGhostRecorder::CGhostCharacter Prev, CNetObj_ClientInfo Info)
+void CGhost::RenderGhost(IGhostRecorder::CGhostCharacter Player, IGhostRecorder::CGhostCharacter Prev, CNetObj_De_ClientInfo Info)
 {
-	char aSkinName[64];
-	IntsToStr(&Info.m_Skin0, 6, aSkinName);
-	int SkinId = m_pClient->m_pSkins->Find(aSkinName);
-	if(SkinId < 0)
+	char aaSkinPartNames[NUM_SKINPARTS][24];
+	int aUseCustomColors[NUM_SKINPARTS];
+	int aSkinPartColors[NUM_SKINPARTS];
+	int aSkinPartIDs[NUM_SKINPARTS];
+	for(int p = 0; p < NUM_SKINPARTS; p++)
 	{
-		SkinId = m_pClient->m_pSkins->Find("default");
-		if(SkinId < 0)
-			SkinId = 0;
+		IntsToStr(Info.m_aaSkinPartNames[p], 6, aaSkinPartNames[p]);
+		aUseCustomColors[p] = Info.m_aUseCustomColors[p];
+		aSkinPartColors[p] = Info.m_aSkinPartColors[p];
 	}
 
 	CTeeRenderInfo RenderInfo;
-	RenderInfo.m_ColorBody = m_pClient->m_pSkins->GetColorV4(Info.m_ColorBody);
-	RenderInfo.m_ColorFeet = m_pClient->m_pSkins->GetColorV4(Info.m_ColorFeet);
-
-	if(Info.m_UseCustomColor)
-		RenderInfo.m_Texture = m_pClient->m_pSkins->Get(SkinId)->m_ColorTexture;
-	else
-	{
-		RenderInfo.m_Texture = m_pClient->m_pSkins->Get(SkinId)->m_OrgTexture;
-		RenderInfo.m_ColorBody = vec4(1,1,1,1);
-		RenderInfo.m_ColorFeet = vec4(1,1,1,1);
-	}
-
-	RenderInfo.m_ColorBody.a = 0.5f;
-	RenderInfo.m_ColorFeet.a = 0.5f;
 	RenderInfo.m_Size = 64;
+
+	for(int p = 0; p < NUM_SKINPARTS; p++)
+	{
+		if(aaSkinPartNames[p][0] == 'x' && aaSkinPartNames[p][1] == '_')
+			str_copy(aaSkinPartNames[p], "default", 24);
+
+		aSkinPartIDs[p] = m_pClient->m_pSkins->FindSkinPart(p, aaSkinPartNames[p]);
+		if(aSkinPartIDs[p] < 0)
+		{
+			aSkinPartIDs[p] = m_pClient->m_pSkins->Find("default");
+			if(aSkinPartIDs[p] < 0)
+				aSkinPartIDs[p] = 0;
+		}
+
+		const CSkins::CSkinPart *pSkinPart = m_pClient->m_pSkins->GetSkinPart(p, aSkinPartIDs[p]);
+		if(aUseCustomColors[p])
+		{
+			RenderInfo.m_aTextures[p] = pSkinPart->m_ColorTexture;
+			RenderInfo.m_aColors[p] = m_pClient->m_pSkins->GetColorV4(aSkinPartColors[p], p==SKINPART_TATTOO);
+			RenderInfo.m_aColors[p].a *= 0.5f;
+		}
+		else
+		{
+			RenderInfo.m_aTextures[p] = pSkinPart->m_OrgTexture;
+			RenderInfo.m_aColors[p] = vec4(1.0f, 1.0f, 1.0f, 0.5f);
+		}
+	}
 
 	float IntraTick = Client()->PredIntraGameTick();
 
@@ -244,7 +258,7 @@ void CGhost::RenderGhostHook(IGhostRecorder::CGhostCharacter Player, IGhostRecor
 	Graphics()->QuadsEnd();
 }
 
-void CGhost::RenderGhostNamePlate(IGhostRecorder::CGhostCharacter Player, IGhostRecorder::CGhostCharacter Prev, CNetObj_ClientInfo Info)
+void CGhost::RenderGhostNamePlate(IGhostRecorder::CGhostCharacter Player, IGhostRecorder::CGhostCharacter Prev, CNetObj_De_ClientInfo Info)
 {
 	if(!g_Config.m_ClGhostNamePlates)
 		return;
@@ -261,7 +275,7 @@ void CGhost::RenderGhostNamePlate(IGhostRecorder::CGhostCharacter Player, IGhost
 		a = clamp(0.5f-powf(distance(m_pClient->m_pControls->m_TargetPos, Pos)/200.0f,16.0f), 0.0f, 0.5f);
 
 	char aName[32];
-	IntsToStr(&Info.m_Name0, 4, aName);
+	IntsToStr(Info.m_aName, 4, aName);
 	float tw = TextRender()->TextWidth(0, FontSize, aName, -1);
 
 	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.5f*a);
@@ -295,14 +309,15 @@ void CGhost::StartRecord()
 {
 	m_Recording = true;
 	m_CurGhost.m_Path.clear();
-	CNetObj_ClientInfo *pInfo = (CNetObj_ClientInfo *) Client()->SnapFindItem(IClient::SNAP_CURRENT, NETOBJTYPE_CLIENTINFO, m_pClient->m_Snap.m_LocalClientID);
+	CNetObj_De_ClientInfo *pInfo = (CNetObj_De_ClientInfo *) Client()->SnapFindItem(IClient::SNAP_CURRENT, NETOBJTYPE_DE_CLIENTINFO, m_pClient->m_LocalClientID);
 	m_CurGhost.m_Info = *pInfo;
 
 	if(g_Config.m_ClRaceSaveGhost)
 	{
-		char aSkinName[32];
-		IntsToStr(&pInfo->m_Skin0, 6, aSkinName);
-		Client()->GhostRecorder_Start(aSkinName, pInfo->m_UseCustomColor, pInfo->m_ColorBody, pInfo->m_ColorFeet);
+		char aaSkinPartNames[NUM_SKINPARTS][24];
+		for(int p = 0; p < NUM_SKINPARTS; p++)
+			IntsToStr(pInfo->m_aaSkinPartNames[p], 6, aaSkinPartNames[p]);
+		Client()->GhostRecorder_Start(aaSkinPartNames, pInfo->m_aUseCustomColors, pInfo->m_aSkinPartColors);
 	}
 }
 
@@ -429,11 +444,13 @@ void CGhost::Load(const char* pFilename, int ID)
 	Ghost.m_Path.set_size(NumShots);
 
 	// read client info
-	StrToInts(&Ghost.m_Info.m_Name0, 4, Header.m_aOwner);
-	StrToInts(&Ghost.m_Info.m_Skin0, 6, Header.m_aSkinName);
-	Ghost.m_Info.m_UseCustomColor = Header.m_UseCustomColor;
-	Ghost.m_Info.m_ColorBody = Header.m_ColorBody;
-	Ghost.m_Info.m_ColorFeet = Header.m_ColorFeet;
+	StrToInts(Ghost.m_Info.m_aName, 4, Header.m_aOwner);
+	for(int p = 0; p < NUM_SKINPARTS; p++)
+	{
+		StrToInts(Ghost.m_Info.m_aaSkinPartNames[p], 6, Header.m_aaSkinName[p]);
+		Ghost.m_Info.m_aUseCustomColors[p] = Header.m_aUseCustomColor[p];
+		Ghost.m_Info.m_aSkinPartColors[p] = Header.m_aColors[p];
+	}
 
 	// read data
 	int Index = 0;
@@ -512,7 +529,7 @@ void CGhost::OnMessage(int MsgType, void *pRawMsg)
 	if(MsgType == NETMSGTYPE_SV_KILLMSG)
 	{
 		CNetMsg_Sv_KillMsg *pMsg = (CNetMsg_Sv_KillMsg *)pRawMsg;
-		if(pMsg->m_Victim == m_pClient->m_Snap.m_LocalClientID)
+		if(pMsg->m_Victim == m_pClient->m_LocalClientID)
 		{
 			if(m_RaceState != RACE_FINISHED)
 				OnReset();
@@ -541,7 +558,7 @@ void CGhost::OnMessage(int MsgType, void *pRawMsg)
 			// prepare values and state for saving
 			int Minutes;
 			float Seconds;
-			if(!str_comp(aName, m_pClient->m_aClients[m_pClient->m_Snap.m_LocalClientID].m_aName) && sscanf(pMessage, " finished in: %d minute(s) %f", &Minutes, &Seconds) == 2)
+			if(!str_comp(aName, m_pClient->m_aClients[m_pClient->m_LocalClientID].m_aName) && sscanf(pMessage, " finished in: %d minute(s) %f", &Minutes, &Seconds) == 2)
 			{
 				m_RaceState = RACE_FINISHED;
 				float CurTime = Minutes*60 + Seconds;

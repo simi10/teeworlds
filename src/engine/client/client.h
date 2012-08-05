@@ -336,7 +336,7 @@ public:
 	void DemoRecorder_AddDemoMarker();
 	void RecordGameMessage(bool State) { m_RecordGameMessage = State; }
 
-	void GhostRecorder_Start(const char* pSkinName, int UseCustomColor, int ColorBody, int ColorFeet);
+	void GhostRecorder_Start(char aaSkinName[6][24], int *paUseCustomColor, int *paColors);
 	void GhostRecorder_Stop(float Time=0.0f);
 	bool GhostIsRecording();
 	void GhostRecorder_AddInfo(IGhostRecorder::CGhostCharacter *pPlayer);

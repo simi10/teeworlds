@@ -914,8 +914,6 @@ void CGameClient::OnNewSnapshot()
 					mem_copy(&m_Tuning, pInfo->m_aTuneParams, sizeof(m_Tuning));
 					m_ServerMode = SERVERMODE_PURE;
 				}
-				// mark Player as online
-				Online[ClientID] = true;
 			}
 			
 			// network items
@@ -938,6 +936,9 @@ void CGameClient::OnNewSnapshot()
 							m_Snap.m_SpecInfo.m_Active = true;
 							m_Snap.m_SpecInfo.m_SpectatorID = SPEC_FREEVIEW;
 						}
+
+						// mark Player as online
+						Online[ClientID] = true;
 					}
 				}
 			}
@@ -1026,7 +1027,7 @@ void CGameClient::OnNewSnapshot()
 		{
 			if(m_IsRace)
 			{
-				if(m_Snap.m_aInfoByScore[i+1].m_pPlayerInfo] && (!m_Snap.m_aInfoByScore[i].m_pPlayerInfo ||
+				if(m_Snap.m_aInfoByScore[i+1].m_pPlayerInfo && (!m_Snap.m_aInfoByScore[i].m_pPlayerInfo ||
 					m_aClients[m_Snap.m_aInfoByScore[i].m_ClientID].m_Score == 0 || (m_aClients[m_Snap.m_aInfoByScore[i].m_ClientID].m_Score > m_aClients[m_Snap.m_aInfoByScore[i+1].m_ClientID].m_Score && m_aClients[m_Snap.m_aInfoByScore[i+1].m_ClientID].m_Score != 0)))
 				{
 					CPlayerInfoItem Tmp = m_Snap.m_aInfoByScore[i];
