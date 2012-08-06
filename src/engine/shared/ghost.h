@@ -22,7 +22,7 @@ class CGhostRecorder : public IGhostRecorder
 public:	
 	CGhostRecorder();
 	
-	int Start(class IStorage *pStorage, class IConsole *pConsole, const char *pFilename, const char *pMap, unsigned MapCrc, const char *pName, const char *pSkinName, int UseCustomColor, int ColorBody, int ColorFeet);
+	int Start(class IStorage *pStorage, class IConsole *pConsole, const char *pFilename, const char *pMap, unsigned MapCrc, const char *pName, char aaSkinName[6][24], int *paUseCustomColor, int *paColors);
 	
 	int Stop(float Time=0.0f);
 	void AddInfos(CGhostCharacter *pPlayer);

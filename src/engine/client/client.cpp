@@ -376,9 +376,7 @@ void CClient::RconAuth(const char *pName, const char *pPassword)
 		return;
 
 	CMsgPacker Msg(NETMSG_RCON_AUTH);
-	Msg.AddString(pName, 32);
 	Msg.AddString(pPassword, 32);
-	Msg.AddInt(1);
 	SendMsgEx(&Msg, MSGFLAG_VITAL);
 }
 
@@ -509,6 +507,7 @@ void CClient::OnEnterGame()
 	m_CurrentRecvTick = 0;
 	m_CurGameTick = 0;
 	m_PrevGameTick = 0;
+	m_CurMenuTick = 0;
 }
 
 void CClient::EnterGame()
@@ -682,6 +681,13 @@ int CClient::SnapNumItems(int SnapID)
 	return m_aSnapshots[SnapID]->m_pSnap->NumItems();
 }
 
+void *CClient::SnapNewItem(int Type, int ID, int Size)
+{
+	dbg_assert(Type >= 0 && Type <=0xffff, "incorrect type");
+	dbg_assert(ID >= 0 && ID <=0xffff, "incorrect id");
+	return ID < 0 ? 0 : m_DemoRecSnapshotBuilder.NewItem(Type, ID, Size);
+}
+
 void CClient::SnapSetStaticsize(int ItemType, int Size)
 {
 	m_SnapshotDelta.SetStaticsize(ItemType, Size);
@@ -796,6 +802,11 @@ void CClient::Render()
 
 	GameClient()->OnRender();
 	DebugRender();
+}
+
+bool CClient::MapLoaded()
+{
+	return m_pMap->IsLoaded();
 }
 
 const char *CClient::LoadMap(const char *pName, const char *pFilename, unsigned WantedCrc)
@@ -992,7 +1003,7 @@ void CClient::ProcessConnlessPacket(CNetChunk *pPacket)
 		str_copy(Info.m_aName, Up.GetString(CUnpacker::SANITIZE_CC|CUnpacker::SKIP_START_WHITESPACES), sizeof(Info.m_aName));
 		str_copy(Info.m_aMap, Up.GetString(CUnpacker::SANITIZE_CC|CUnpacker::SKIP_START_WHITESPACES), sizeof(Info.m_aMap));
 		str_copy(Info.m_aGameType, Up.GetString(CUnpacker::SANITIZE_CC|CUnpacker::SKIP_START_WHITESPACES), sizeof(Info.m_aGameType));
-		Info.m_Flags = str_toint(Up.GetString());
+		Info.m_Flags = (str_toint(Up.GetString())&SERVER_FLAG_PASSWORD) ? IServerBrowser::FLAG_PASSWORD : 0;
 		Info.m_NumPlayers = str_toint(Up.GetString());
 		Info.m_MaxPlayers = str_toint(Up.GetString());
 		Info.m_NumClients = str_toint(Up.GetString());
@@ -1183,17 +1194,17 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 			if(Unpacker.Error() == 0)
 				m_pConsole->DeregisterTemp(pName);
 		}
-		else if(Msg == NETMSG_RCON_AUTH_STATUS)
+		else if(Msg == NETMSG_RCON_AUTH_ON)
 		{
-			int Result = Unpacker.GetInt();
-			if(Unpacker.Error() == 0)
-				m_RconAuthed = Result;
-			int Old = m_UseTempRconCommands;
-			m_UseTempRconCommands = Unpacker.GetInt();
-			if(Unpacker.Error() != 0)
-				m_UseTempRconCommands = 0;
-			if(Old != 0 && m_UseTempRconCommands == 0)
+			m_RconAuthed = 1;
+			m_UseTempRconCommands = 1;
+		}
+		else if(Msg == NETMSG_RCON_AUTH_OFF)
+		{
+			m_RconAuthed = 0;
+			if(m_UseTempRconCommands)
 				m_pConsole->DeregisterTempAll();
+			m_UseTempRconCommands = 0;
 		}
 		else if(Msg == NETMSG_RCON_LINE)
 		{
@@ -1378,6 +1389,11 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 					// add snapshot to demo
 					if(m_DemoRecorder.IsRecording())
 					{
+						// build up snapshot and add local messages
+						m_DemoRecSnapshotBuilder.Init(pTmpBuffer3);
+						GameClient()->OnDemoRecSnap();
+						SnapSize = m_DemoRecSnapshotBuilder.Finish(pTmpBuffer3);
+
 						// write snapshot
 						m_DemoRecorder.RecordSnapshot(GameTick, pTmpBuffer3, SnapSize);
 					}
@@ -1419,10 +1435,10 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 	else
 	{
 		// game message
-		if(m_DemoRecorder.IsRecording())
-			m_DemoRecorder.RecordMessage(pPacket->m_pData, pPacket->m_DataSize);
-
 		GameClient()->OnMessage(Msg, &Unpacker);
+
+		if(m_RecordGameMessage && m_DemoRecorder.IsRecording())
+			m_DemoRecorder.RecordMessage(pPacket->m_pData, pPacket->m_DataSize);
 	}
 }
 
@@ -1742,6 +1758,8 @@ void CClient::Run()
 		atexit(SDL_Quit); // ignore_convention
 	}
 
+	m_MenuStartTime = time_get();
+
 	// init graphics
 	{
 		if(g_Config.m_GfxThreaded)
@@ -1962,6 +1980,14 @@ void CClient::Run()
 		if(State() == IClient::STATE_QUITING)
 			break;
 
+		// menu tick
+		if(State() == IClient::STATE_OFFLINE)
+		{
+			int64 t = time_get();
+			while(t > TickStartTime(m_CurMenuTick+1))
+				m_CurMenuTick++;
+		}
+
 		// beNice
 		if(g_Config.m_DbgStress)
 			thread_sleep(5);
@@ -2007,6 +2033,10 @@ void CClient::Run()
 	}
 }
 
+int64 CClient::TickStartTime(int Tick)
+{
+	return m_MenuStartTime + (time_freq()*Tick)/m_GameTickSpeed;
+}
 
 void CClient::Con_Connect(IConsole::IResult *pResult, void *pUserData)
 {
@@ -2201,15 +2231,16 @@ void CClient::GhostRecorder_AddInfo(IGhostRecorder::CGhostCharacter *pPlayer)
 const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)
 {
 	int Crc;
-	const char *pError;
+	
 	Disconnect();
 	m_NetClient.ResetErrorString();
 
 	// try to start playback
 	m_DemoPlayer.SetListner(this);
 
-	if(m_DemoPlayer.Load(Storage(), m_pConsole, pFilename, StorageType))
-		return "error loading demo";
+	const char *pError = m_DemoPlayer.Load(Storage(), m_pConsole, pFilename, StorageType, GameClient()->NetVersion());
+	if(pError)
+		return pError;
 
 	// load map
 	Crc = (m_DemoPlayer.Info()->m_Header.m_aMapCrc[0]<<24)|
@@ -2336,16 +2367,6 @@ void CClient::ConchainServerBrowserUpdate(IConsole::IResult *pResult, void *pUse
 void CClient::RegisterCommands()
 {
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
-	// register server dummy commands for tab completion
-	m_pConsole->Register("kick", "i?r", CFGFLAG_SERVER, 0, 0, "Kick player with specified id for any reason");
-	m_pConsole->Register("ban", "s?ir", CFGFLAG_SERVER, 0, 0, "Ban player with ip/id for x minutes for any reason");
-	m_pConsole->Register("unban", "s", CFGFLAG_SERVER, 0, 0, "Unban ip");
-	m_pConsole->Register("bans", "", CFGFLAG_SERVER, 0, 0, "Show banlist");
-	m_pConsole->Register("status", "", CFGFLAG_SERVER, 0, 0, "List players");
-	m_pConsole->Register("shutdown", "", CFGFLAG_SERVER, 0, 0, "Shut down");
-	m_pConsole->Register("record", "?s", CFGFLAG_SERVER, 0, 0, "Record to a file");
-	m_pConsole->Register("stoprecord", "", CFGFLAG_SERVER, 0, 0, "Stop recording");
-	m_pConsole->Register("reload", "", CFGFLAG_SERVER, 0, 0, "Reload the map");
 
 	m_pConsole->Register("quit", "", CFGFLAG_CLIENT|CFGFLAG_STORE, Con_Quit, this, "Quit Teeworlds");
 	m_pConsole->Register("exit", "", CFGFLAG_CLIENT|CFGFLAG_STORE, Con_Quit, this, "Quit Teeworlds");
@@ -2461,10 +2482,10 @@ int main(int argc, const char **argv) // ignore_convention
 	// register all console commands
 	pClient->RegisterCommands();
 
-	pKernel->RequestInterface<IGameClient>()->OnConsoleInit();
-
 	// init client's interfaces
 	pClient->InitInterfaces();
+
+	pKernel->RequestInterface<IGameClient>()->OnConsoleInit();
 
 	// execute config file
 	pConsole->ExecuteFile("settings.cfg");

@@ -15,7 +15,8 @@
 void CNamePlates::RenderNameplate(
 	const CNetObj_Character *pPrevChar,
 	const CNetObj_Character *pPlayerChar,
-	const CNetObj_PlayerInfo *pPlayerInfo
+	const CNetObj_PlayerInfo *pPlayerInfo,
+	int ClientID
 	)
 {
 	float IntraTick = Client()->IntraGameTick();
@@ -25,7 +26,7 @@ void CNamePlates::RenderNameplate(
 
 	float FontSize = 18.0f + 20.0f * g_Config.m_ClNameplatesSize / 100.0f;
 	// render name plate
-	if(!pPlayerInfo->m_Local)
+	if(m_pClient->m_LocalClientID != ClientID)
 	{
 		//TextRender()->TextColor
 		float a = 1.0f;
@@ -34,19 +35,19 @@ void CNamePlates::RenderNameplate(
 
 		char aName[256];
 		if(!g_Config.m_TcNameplateScore)
-			str_format(aName, 256, "%s", m_pClient->m_aClients[pPlayerInfo->m_ClientID].m_aName);
+			str_format(aName, 256, "%s", m_pClient->m_aClients[m_ClientID].m_aName);
 		else
-			str_format(aName, 256, "%s (%d)", m_pClient->m_aClients[pPlayerInfo->m_ClientID].m_aName, pPlayerInfo->m_Score);
+			str_format(aName, 256, "%s (%d)", m_pClient->m_aClients[m_ClientID].m_aName, pPlayerInfo->m_Score);
 		float tw = TextRender()->TextWidth(0, FontSize, aName, -1);
 
 		bool IsTeamplay;
-		IsTeamplay = m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_TEAMS;
+		IsTeamplay = m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS
 		TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.5f*a);
 		if(g_Config.m_ClNameplatesTeamcolors && IsTeamplay)
 		{
 			vec3 Col = CTeecompUtils::GetTeamColor(
-				m_pClient->m_aClients[pPlayerInfo->m_ClientID].m_Team,
-				m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_Snap.m_pLocalInfo->m_Team : TEAM_RED,
+				m_pClient->m_aClients[ClientID].m_Team,
+				m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED,
 				g_Config.m_TcColoredTeesTeam1,
 				g_Config.m_TcColoredTeesTeam2,
 				g_Config.m_TcColoredTeesMethod);
@@ -59,7 +60,7 @@ void CNamePlates::RenderNameplate(
 		if(g_Config.m_Debug || g_Config.m_ClNameplateClientID) // render client id when in debug aswell
 		{
 			char aBuf[128];
-			str_format(aBuf, sizeof(aBuf),"%d", pPlayerInfo->m_ClientID);
+			str_format(aBuf, sizeof(aBuf),"%d", ClientID);
 			tw = TextRender()->TextWidth(0, FontSize, aBuf, -1);
 			TextRender()->Text(0, Position.x-tw/2.0f, Position.y-(FontSize*2.0f)-38.0f, FontSize, aBuf, -1);
 		}
@@ -87,7 +88,8 @@ void CNamePlates::OnRender()
 			RenderNameplate(
 				&m_pClient->m_Snap.m_aCharacters[i].m_Prev,
 				&m_pClient->m_Snap.m_aCharacters[i].m_Cur,
-				(const CNetObj_PlayerInfo *)pInfo);
+				(const CNetObj_PlayerInfo *)pInfo,
+				i);
 		}
 	}
 }

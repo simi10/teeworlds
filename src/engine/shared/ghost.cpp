@@ -19,7 +19,7 @@ CGhostRecorder::CGhostRecorder()
 }
 
 // Record
-int CGhostRecorder::Start(IStorage *pStorage, IConsole *pConsole, const char *pFilename, const char *pMap, unsigned Crc, const char* pName, const char *pSkinName, int UseCustomColor, int ColorBody, int ColorFeet)
+int CGhostRecorder::Start(IStorage *pStorage, IConsole *pConsole, const char *pFilename, const char *pMap, unsigned Crc, const char* pName, char aaSkinName[6][24], int *paUseCustomColor, int *paColors)
 {
 	CGhostHeader Header;
 	if(m_File)
@@ -45,10 +45,9 @@ int CGhostRecorder::Start(IStorage *pStorage, IConsole *pConsole, const char *pF
 	mem_copy(Header.m_aMarker, gs_aHeaderMarker, sizeof(Header.m_aMarker));
 	Header.m_Version = gs_ActVersion;
 	str_copy(Header.m_aOwner, pName, sizeof(Header.m_aOwner));
-	str_copy(Header.m_aSkinName, pSkinName, sizeof(Header.m_aSkinName));
-	Header.m_UseCustomColor = UseCustomColor;
-	Header.m_ColorBody = ColorBody;
-	Header.m_ColorFeet = ColorFeet;
+	mem_copy(Header.m_aaSkinName, aaSkinName, sizeof(Header.m_aaSkinName));
+	mem_copy(Header.m_aUseCustomColor, paUseCustomColor, sizeof(Header.m_aUseCustomColor));
+	mem_copy(Header.m_aColors, paColors, sizeof(Header.m_aColors));
 	str_copy(Header.m_aMap, pMap, sizeof(Header.m_aMap));
 	Header.m_aCrc[0] = (Crc>>24)&0xff;
 	Header.m_aCrc[1] = (Crc>>16)&0xff;
