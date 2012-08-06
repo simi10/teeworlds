@@ -222,7 +222,7 @@ void CServerBrowser::CServerFilter::Filter()
 			Filtered = 1;
 		else if(!(m_SortHash&FILTER_GAMETYPE_STRICT) && m_aGametype[0] && !str_find_nocase(m_pServerBrowser->m_ppServerlist[i]->m_Info.m_aGameType, m_aGametype))
 			Filtered = 1;
-		else if(g_Config.m_BrFilterTeerace && !m_pServerBrowser->m_ppServerlist[i]->m_Info.m_Teerace)
+		else if(m_SortHash&FILTER_TEERACE && !m_pServerBrowser->m_ppServerlist[i]->m_Info.m_Teerace)
 			Filtered = 1;
 		else
 		{

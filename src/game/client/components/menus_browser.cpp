@@ -959,6 +959,7 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 		g_Config.m_BrFilterPure = 1;
 		g_Config.m_BrFilterPureMap = 1;
 		g_Config.m_BrFilterCompatversion = 1;
+		g_Config.m_BrFilterTeerace = 0;
 		Client()->ServerBrowserUpdate();
 	}
 }
