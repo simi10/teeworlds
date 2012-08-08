@@ -197,8 +197,8 @@ public:
 		bool m_ChatIgnore;
 		bool m_Friend;
 
-		void UpdateRenderInfo(bool UpdateSkinInfo);
-		void Reset();
+		void UpdateRenderInfo(bool UpdateSkinInfo, int ClientID);
+		void Reset(int ClientID);
 
 		// race
 		float m_Score;

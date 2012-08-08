@@ -3,46 +3,75 @@
 #include <engine/shared/config.h>
 #include "teecomp.h"
 
-vec3 CTeecompUtils::GetTeamColor(int ForTeam, int LocalTeam, int Color1, int Color2, int Method)
+char *const gs_apTeecompSkinVariables1[NUM_SKINPARTS] = {g_Config.m_TcForcedSkin1, g_Config.m_TcForcedSkinTattoo1, g_Config.m_TcForcedSkinDecoration1,
+													g_Config.m_TcForcedSkinHands1, g_Config.m_TcForcedSkinFeet1, g_Config.m_TcForcedSkinEyes1};
+char *const gs_apTeecompSkinVariables2[NUM_SKINPARTS] = {g_Config.m_TcForcedSkin2, g_Config.m_TcForcedSkinTattoo2, g_Config.m_TcForcedSkinDecoration2,
+													g_Config.m_TcForcedSkinHands2, g_Config.m_TcForcedSkinFeet2, g_Config.m_TcForcedSkinEyes2};
+
+vec3 CTeecompUtils::GetTeamColor(int ForTeam, int LocalTeam, int Method)
 {
-	vec3 c1((Color1>>16)/255.0f, ((Color1>>8)&0xff)/255.0f, (Color1&0xff)/255.0f);
-	vec3 c2((Color2>>16)/255.0f, ((Color2>>8)&0xff)/255.0f, (Color2&0xff)/255.0f);
+	int Color1 = g_Config.m_TcColoredTeesTeam1;
+	int Color2 = g_Config.m_TcColoredTeesTeam2;
 
 	// Team based Colors or spectating
 	if(!Method || LocalTeam == -1)
 	{
 		if(ForTeam == 0)
-			return c1;
-		return c2;
+			return vec3((Color1>>16)/255.0f, ((Color1>>8)&0xff)/255.0f, (Color1&0xff)/255.0f);
+		return vec3((Color2>>16)/255.0f, ((Color2>>8)&0xff)/255.0f, (Color2&0xff)/255.0f);
 	}
 
 	// Enemy based Colors
 	if(ForTeam == LocalTeam)
-		return c1;
-	return c2;
+		return vec3((Color1>>16)/255.0f, ((Color1>>8)&0xff)/255.0f, (Color1&0xff)/255.0f);
+	return vec3((Color2>>16)/255.0f, ((Color2>>8)&0xff)/255.0f, (Color2&0xff)/255.0f);
 }
 
-bool CTeecompUtils::GetForcedSkinName(int ForTeam, int LocalTeam, const char*& pSkinName)
+int CTeecompUtils::GetTeamColorInt(int ForTeam, int LocalTeam, int Method, int Part)
+{
+	int Color1 = g_Config.m_TcColoredTeesTeam1;
+	int Color2 = g_Config.m_TcColoredTeesTeam2;
+	if(Part == SKINPART_TATTOO)
+	{
+		Color1 |= 0xff000000;
+		Color2 |= 0xff000000;
+	}
+
+	// Team based Colors or spectating
+	if(!Method || LocalTeam == -1)
+	{
+		if(ForTeam == 0)
+			return Color1;
+		return Color2;
+	}
+
+	// Enemy based Colors
+	if(ForTeam == LocalTeam)
+		return Color1;
+	return Color2;
+}
+
+bool CTeecompUtils::GetForcedSkinPartName(int ForTeam, int LocalTeam, const char*& pSkinPartName, int Part)
 {
 	// Team based Colors or spectating
 	if(!g_Config.m_TcForcedSkinsMethod || LocalTeam == -1)
 	{
 		if(ForTeam == 0)
 		{
-			pSkinName = g_Config.m_TcForcedSkin1;
+			pSkinPartName = gs_apTeecompSkinVariables1[Part];
 			return g_Config.m_TcForceSkinTeam1;
 		}
-		pSkinName = g_Config.m_TcForcedSkin2;
+		pSkinPartName = gs_apTeecompSkinVariables2[Part];
 		return g_Config.m_TcForceSkinTeam2;
 	}
 
 	// Enemy based Colors
 	if(ForTeam == LocalTeam)
 	{
-		pSkinName = g_Config.m_TcForcedSkin1;
+		pSkinPartName = gs_apTeecompSkinVariables1[Part];
 		return g_Config.m_TcForceSkinTeam1;
 	}
-	pSkinName = g_Config.m_TcForcedSkin2;
+	pSkinPartName = gs_apTeecompSkinVariables2[Part];
 	return g_Config.m_TcForceSkinTeam2;
 }
 

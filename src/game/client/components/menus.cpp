@@ -2061,12 +2061,10 @@ void CMenus::OnStateChange(int NewState, int OldState)
 		// refresh server browser
 		if(m_SearchedIngame)
 		{
-			if(g_Config.m_UiPage == PAGE_INTERNET && m_IngamebrowserControlPage != IServerBrowser::TYPE_INTERNET)
+			if(g_Config.m_UiBrowserPage == PAGE_INTERNET && m_IngamebrowserControlPage != IServerBrowser::TYPE_INTERNET)
 				ServerBrowser()->Refresh(IServerBrowser::TYPE_INTERNET);
-			else if(g_Config.m_UiPage == PAGE_LAN && m_IngamebrowserControlPage != IServerBrowser::TYPE_LAN)
+			else if(g_Config.m_UiBrowserPage == PAGE_LAN && m_IngamebrowserControlPage != IServerBrowser::TYPE_LAN)
 				ServerBrowser()->Refresh(IServerBrowser::TYPE_LAN);
-			else if(g_Config.m_UiPage == PAGE_FAVORITES && m_IngamebrowserControlPage != IServerBrowser::TYPE_FAVORITES)
-				ServerBrowser()->Refresh(IServerBrowser::TYPE_FAVORITES);
 		}
 		m_SearchedIngame = false;
 	}

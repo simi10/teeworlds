@@ -190,7 +190,7 @@ void CHud::RenderScoreHud()
 				Graphics()->BlendNormal();
 				Graphics()->TextureSet(-1);
 				Graphics()->QuadsBegin();
-				if(!g_Config.m_TcHudMatch || CTeecompUtils::GetForceDmColors(t, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_Snap.m_pLocalInfo->m_Team : TEAM_RED))
+				if(!g_Config.m_TcHudMatch || CTeecompUtils::GetForceDmColors(t, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED))
 				{
 					if(t == 0)
 						Graphics()->SetColor(1.0f, 0.0f, 0.0f, 0.25f);
@@ -199,8 +199,7 @@ void CHud::RenderScoreHud()
 				}
 				else
 				{
-					vec3 Col = CTeecompUtils::GetTeamColor(t, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_Snap.m_pLocalInfo->m_Team : TEAM_RED,
-									g_Config.m_TcColoredTeesTeam1, g_Config.m_TcColoredTeesTeam2, g_Config.m_TcColoredTeesMethod);
+					vec3 Col = CTeecompUtils::GetTeamColor(t, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED, g_Config.m_TcColoredTeesMethod);
 					Graphics()->SetColor(Col.r, Col.g, Col.b, 0.25f);
 				}
 				RenderTools()->DrawRoundRectExt(Whole-ScoreWidthMax-ImageSize-2*Split, StartY+t*20, ScoreWidthMax+ImageSize+2*Split, 18.0f, 5.0f, CUI::CORNER_L);
@@ -243,11 +242,7 @@ void CHud::RenderScoreHud()
 						
 						if(g_Config.m_TcColoredFlags)
 						{
-							vec3 Col = CTeecompUtils::GetTeamColor(t,
-																   m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_Snap.m_pLocalInfo->m_Team : TEAM_RED,
-																   g_Config.m_TcColoredTeesTeam1,
-																   g_Config.m_TcColoredTeesTeam2,
-																   g_Config.m_TcColoredTeesMethod);
+							vec3 Col = CTeecompUtils::GetTeamColor(t, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED, g_Config.m_TcColoredTeesMethod);
 							Graphics()->SetColor(Col.r, Col.g, Col.b, 1.0f);
 						}
 						
@@ -631,7 +626,7 @@ void CHud::RenderSpeedmeter()
 		Speed += SmoothTable[i];
 	Speed /= SMOOTH_TABLE_SIZE;
 
-	int GameFlags = m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags;
+	int GameFlags = m_pClient->m_GameInfo.m_GameFlags;
 	int t = (((GameFlags&GAMEFLAG_TEAMS && g_Config.m_ClRenderTeamScore) || (!GameFlags&GAMEFLAG_TEAMS  && g_Config.m_ClRenderDmScore)) && !m_pClient->m_IsRace) ? -1 : 1;
 	int LastIndex = SmoothIndex - 1;
 	if(LastIndex < 0)
@@ -650,8 +645,8 @@ void CHud::RenderSpeedmeter()
 	if(GameFlags&GAMEFLAG_TEAMS && g_Config.m_ClRenderTeamScore)
 	{
 		char aScoreTeam[2][32];
-		str_format(aScoreTeam[TEAM_RED], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataObj->m_TeamscoreRed);
-		str_format(aScoreTeam[TEAM_BLUE], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataObj->m_TeamscoreBlue);
+		str_format(aScoreTeam[TEAM_RED], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataTeam->m_TeamscoreRed);
+		str_format(aScoreTeam[TEAM_BLUE], sizeof(aScoreTeam)/2, "%d", m_pClient->m_Snap.m_pGameDataTeam->m_TeamscoreBlue);
 		float aScoreTeamWidth[2] = {TextRender()->TextWidth(0, 14.0f, aScoreTeam[TEAM_RED], -1), TextRender()->TextWidth(0, 14.0f, aScoreTeam[TEAM_BLUE], -1)};
 		float ScoreWidthMax = max(max(aScoreTeamWidth[TEAM_RED], aScoreTeamWidth[TEAM_BLUE]), TextRender()->TextWidth(0, 14.0f, "100", -1));
 		float Split = 3.0f;
@@ -665,13 +660,13 @@ void CHud::RenderSpeedmeter()
 
 		if(!GameFlags&GAMEFLAG_TEAMS && g_Config.m_ClRenderDmScore && !m_pClient->m_IsRace)
 		{
-			const CNetObj_PlayerInfo *apPlayerInfo[2] = { 0, 0 };
+			const CGameClient::CPlayerInfoItem *apPlayerInfo[2] = { 0, 0 };
 			int i = 0;
-			for(int j = 0; j < 2 && i < MAX_CLIENTS && m_pClient->m_Snap.m_paInfoByScore[i]; ++i)
+			for(int j = 0; j < 2 && i < MAX_CLIENTS && m_pClient->m_Snap.m_aInfoByScore[i].m_pPlayerInfo; ++i)
 			{
-				if(m_pClient->m_Snap.m_paInfoByScore[i]->m_Team != TEAM_SPECTATORS)
+				if(m_pClient->m_aClients[m_pClient->m_Snap.m_aInfoByScore[i].m_ClientID].m_Team != TEAM_SPECTATORS)
 				{
-					apPlayerInfo[j] = m_pClient->m_Snap.m_paInfoByScore[i];
+					apPlayerInfo[j] = &m_pClient->m_Snap.m_aInfoByScore[i];
 					++j;
 				}
 			}
@@ -679,8 +674,8 @@ void CHud::RenderSpeedmeter()
 			char aScore[2][32];
 			for(int j = 0; j < 2; ++j)
 			{
-				if(apPlayerInfo[j])
-					str_format(aScore[j], sizeof(aScore)/2, "%d", apPlayerInfo[j]->m_Score);
+				if(apPlayerInfo[j]->m_pPlayerInfo)
+					str_format(aScore[j], sizeof(aScore)/2, "%d", apPlayerInfo[j]->m_pPlayerInfo->m_Score);
 				else
 					aScore[j][0] = 0;
 			}
@@ -830,7 +825,7 @@ void CHud::OnMessage(int MsgType, void *pRawMsg)
 	else if(MsgType == NETMSGTYPE_SV_KILLMSG)
 	{
 		CNetMsg_Sv_KillMsg *pMsg = (CNetMsg_Sv_KillMsg *)pRawMsg;
-		if(pMsg->m_Victim == m_pClient->m_Snap.m_LocalClientID)
+		if(pMsg->m_Victim == m_pClient->m_LocalClientID)
 		{
 			m_CheckpointTick = 0;
 			m_RaceTime = 0;
@@ -862,7 +857,7 @@ void CHud::OnMessage(int MsgType, void *pRawMsg)
 			char PlayerName[MAX_NAME_LENGTH];
 			str_copy(PlayerName, pMsg->m_pMessage, Num+1);
 
-			if(!str_comp(PlayerName, m_pClient->m_aClients[m_pClient->m_Snap.m_LocalClientID].m_aName))
+			if(!str_comp(PlayerName, m_pClient->m_aClients[m_pClient->m_LocalClientID].m_aName))
 			{
 				int Minutes = 0;
 				float Seconds = 0.0f;

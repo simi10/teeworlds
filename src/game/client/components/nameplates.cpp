@@ -35,22 +35,17 @@ void CNamePlates::RenderNameplate(
 
 		char aName[256];
 		if(!g_Config.m_TcNameplateScore)
-			str_format(aName, 256, "%s", m_pClient->m_aClients[m_ClientID].m_aName);
+			str_format(aName, 256, "%s", m_pClient->m_aClients[ClientID].m_aName);
 		else
-			str_format(aName, 256, "%s (%d)", m_pClient->m_aClients[m_ClientID].m_aName, pPlayerInfo->m_Score);
+			str_format(aName, 256, "%s (%d)", m_pClient->m_aClients[ClientID].m_aName, pPlayerInfo->m_Score);
 		float tw = TextRender()->TextWidth(0, FontSize, aName, -1);
 
 		bool IsTeamplay;
-		IsTeamplay = m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS
+		IsTeamplay = m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS;
 		TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.5f*a);
 		if(g_Config.m_ClNameplatesTeamcolors && IsTeamplay)
 		{
-			vec3 Col = CTeecompUtils::GetTeamColor(
-				m_pClient->m_aClients[ClientID].m_Team,
-				m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED,
-				g_Config.m_TcColoredTeesTeam1,
-				g_Config.m_TcColoredTeesTeam2,
-				g_Config.m_TcColoredTeesMethod);
+			vec3 Col = CTeecompUtils::GetTeamColor(m_pClient->m_aClients[ClientID].m_Team, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED, g_Config.m_TcColoredTeesMethod);
 			TextRender()->TextColor(Col.r, Col.g, Col.b, a);
 		}
 		else // FFA or no colored plates

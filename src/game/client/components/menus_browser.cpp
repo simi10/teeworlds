@@ -960,6 +960,7 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 		g_Config.m_BrFilterPure = 1;
 		g_Config.m_BrFilterPureMap = 1;
 		g_Config.m_BrFilterCompatversion = 1;
+		g_Config.m_BrFilterTeerace = 0;
 		Client()->ServerBrowserUpdate();
 	}
 }
@@ -1033,7 +1034,7 @@ void CMenus::RenderServerbrowserServerDetail(CUIRect View, const CServerInfo *pI
 		RenderTools()->DrawUIRect(&ServerScoreBoard, vec4(0,0,0,0.15f), CUI::CORNER_B, 4.0f);
 		UI()->DoLabelScaled(&ServerHeader, Localize("Scoreboard"), FontSize+2.0f, 0);
 
-		bool Shrink = Client()->State() == IClient::STATE_ONLINE && pSelectedServer->m_NumClients > 13;
+		bool Shrink = Client()->State() == IClient::STATE_ONLINE && pInfo->m_NumClients > 13;
 		ServerScoreBoard.Margin(3.0f, &ServerScoreBoard);
 		for (int i = 0; i < pInfo->m_NumClients; i++)
 		{

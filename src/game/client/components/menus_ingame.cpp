@@ -83,7 +83,6 @@ void CMenus::RenderGame(CUIRect MainView)
 				m_pClient->SendSwitchTeam(TEAM_BLUE);
 				SetActive(false);
 			}
-			}
 		}
 	}
 	else
@@ -426,9 +425,9 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 		"\n"
 		"%s: %d/%d\n",
 		Localize("Game type"), CurrentServerInfo.m_aGameType,
-		Localize("Score limit"), m_pClient->m_Snap.m_pGameInfoObj->m_ScoreLimit,
-		Localize("Time limit"), m_pClient->m_Snap.m_pGameInfoObj->m_TimeLimit,
-		Localize("Players"), m_pClient->m_Snap.m_NumPlayers, CurrentServerInfo.m_MaxClients
+		Localize("Score limit"), m_pClient->m_GameInfo.m_ScoreLimit,
+		Localize("Time limit"), m_pClient->m_GameInfo.m_TimeLimit,
+		Localize("Players"), m_pClient->m_GameInfo.m_NumPlayers, CurrentServerInfo.m_MaxClients
 	);
 	TextRender()->Text(0, GameInfo.x+x, GameInfo.y+y, 20, aBuf, 250);
 
@@ -444,26 +443,23 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 	TextRender()->Text(0, MapInfo.x+x, MapInfo.y+y, 32, Localize("Map info"), 250);
 	y += 32.0f+5.0f;
 
-	if(m_pClient->m_Snap.m_pGameInfoObj)
-	{
-		mem_zero(aBuf, sizeof(aBuf));
-		str_format(
-			aBuf,
-			sizeof(aBuf),
-			"%s: %s\n"
-			"%s: %s\n"
-			"%s: %s\n"
-			"%s: %s\n"
-			"\n"
-			"%s: %s\n",
-			Localize("Map"), CurrentServerInfo.m_aMap,
-			Localize("Version"), m_MapInfo.m_aVersion,
-			Localize("Author"), m_MapInfo.m_aAuthor,
-			Localize("Credits"), m_MapInfo.m_aCredits,
-			Localize("License"), m_MapInfo.m_aLicense
-		);
-		TextRender()->Text(0, MapInfo.x+x, MapInfo.y+y, 20, aBuf, MapInfo.w-5.0f);
-	}
+	mem_zero(aBuf, sizeof(aBuf));
+	str_format(
+		aBuf,
+		sizeof(aBuf),
+		"%s: %s\n"
+		"%s: %s\n"
+		"%s: %s\n"
+		"%s: %s\n"
+		"\n"
+		"%s: %s\n",
+		Localize("Map"), CurrentServerInfo.m_aMap,
+		Localize("Version"), m_MapInfo.m_aVersion,
+		Localize("Author"), m_MapInfo.m_aAuthor,
+		Localize("Credits"), m_MapInfo.m_aCredits,
+		Localize("License"), m_MapInfo.m_aLicense
+	);
+	TextRender()->Text(0, MapInfo.x+x, MapInfo.y+y, 20, aBuf, MapInfo.w-5.0f);
 
 	// motd
 	Motd.HSplitTop(10.0f, 0, &Motd);
@@ -486,7 +482,7 @@ void CMenus::RenderServerIngameServerbrowser(CUIRect MainView)
 
 	// tab bar
 	{
-		TabBar.VSplitLeft(TabBar.w/3, &Button, &TabBar);
+		TabBar.VSplitLeft(TabBar.w/2, &Button, &TabBar);
 		static int s_Button0 = 0;
 		if(DoButton_MenuTab(&s_Button0, Localize("Internet"), m_IngamebrowserControlPage == 0, &Button, 0))
 		{
@@ -502,14 +498,6 @@ void CMenus::RenderServerIngameServerbrowser(CUIRect MainView)
 			m_SearchedIngame = true;
 			ServerBrowser()->Refresh(IServerBrowser::TYPE_LAN);
 			m_IngamebrowserControlPage = IServerBrowser::TYPE_LAN;
-		}
-
-		static int s_Button2 = 0;
-		if(DoButton_MenuTab(&s_Button2, Localize("Favorites"), m_IngamebrowserControlPage == 2, &TabBar, 0))
-		{
-			m_SearchedIngame = true;
-			ServerBrowser()->Refresh(IServerBrowser::TYPE_FAVORITES);
-			m_IngamebrowserControlPage = IServerBrowser::TYPE_FAVORITES;
 		}
 	}
 

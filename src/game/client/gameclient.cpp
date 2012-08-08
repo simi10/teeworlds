@@ -689,7 +689,7 @@ void CGameClient::OnMessage(int MsgID, CUnpacker *pUnpacker)
 		// update friend state
 		m_aClients[pMsg->m_ClientID].m_Friend = Friends()->IsFriend(m_aClients[pMsg->m_ClientID].m_aName, m_aClients[pMsg->m_ClientID].m_aClan, true);
 
-		m_aClients[pMsg->m_ClientID].UpdateRenderInfo(true);
+		m_aClients[pMsg->m_ClientID].UpdateRenderInfo(true, pMsg->m_ClientID);
 
 		m_GameInfo.m_NumPlayers++;
 		// calculate team-balance
@@ -719,7 +719,7 @@ void CGameClient::OnMessage(int MsgID, CUnpacker *pUnpacker)
 		if(m_aClients[pMsg->m_ClientID].m_Team != TEAM_SPECTATORS)
 			m_GameInfo.m_aTeamSize[m_aClients[pMsg->m_ClientID].m_Team]--;
 
-		m_aClients[pMsg->m_ClientID].Reset();
+		m_aClients[pMsg->m_ClientID].Reset(pMsg->m_ClientID);
 	}
 	else if(MsgID == NETMSGTYPE_SV_GAMEINFO)
 	{
@@ -749,7 +749,7 @@ void CGameClient::OnMessage(int MsgID, CUnpacker *pUnpacker)
 			m_pChat->AddLine(-1, 0, aBuf);
 		}
 
-		m_aClients[pMsg->m_ClientID].UpdateRenderInfo(false);
+		m_aClients[pMsg->m_ClientID].UpdateRenderInfo(false, pMsg->m_ClientID);
 
 		Client()->RecordGameMessage(false);
 	}
@@ -1004,7 +1004,10 @@ void CGameClient::OnNewSnapshot()
 						pClient->m_aSkinPartColors[p] = pInfo->m_aSkinPartColors[p];
 					}
 
-					pClient->UpdateRenderInfo(true);
+					pClient->UpdateRenderInfo(true, ClientID);
+
+					// mark Player as online
+					Online[ClientID] = true;
 				}
 				else if(Item.m_Type == NETOBJTYPE_DE_TUNEPARAMS)
 				{
@@ -1013,9 +1016,6 @@ void CGameClient::OnNewSnapshot()
 					mem_copy(&m_Tuning, pInfo->m_aTuneParams, sizeof(m_Tuning));
 					m_ServerMode = SERVERMODE_PURE;
 				}
-
-				// mark Player as online
-				Online[ClientID] = true;
 			}
 			
 			// network items
@@ -1081,8 +1081,8 @@ void CGameClient::OnNewSnapshot()
 				else if(!m_IsRace && m_Snap.m_pGameData->m_GameStartTick-m_LastRoundStartTick > 2)
 					OnStartGame();
 
-				m_LastGameOver = m_Snap.m_pGameInfoObj->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER;
-				m_LastRoundStartTick = m_Snap.m_pGameInfoObj->m_GameStartTick;
+				m_LastGameOver = m_Snap.m_pGameData->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER;
+				m_LastRoundStartTick = m_Snap.m_pGameData->m_GameStartTick;
 			}
 			else if(Item.m_Type == NETOBJTYPE_GAMEDATATEAM)
 			{
@@ -1456,9 +1456,9 @@ void CGameClient::OnActivateEditor()
 void CGameClient::OnFlagGrab(int ID)
 {
 	if(ID == TEAM_RED)
-		m_aStats[m_Snap.m_pGameDataObj->m_FlagCarrierRed].m_FlagGrabs++;
+		m_aStats[m_Snap.m_pGameDataFlag->m_FlagCarrierRed].m_FlagGrabs++;
 	else
-		m_aStats[m_Snap.m_pGameDataObj->m_FlagCarrierBlue].m_FlagGrabs++;
+		m_aStats[m_Snap.m_pGameDataFlag->m_FlagCarrierBlue].m_FlagGrabs++;
 }
 
 CGameClient::CClientStats::CClientStats()
@@ -1544,7 +1544,7 @@ void CGameClient::CClientData::UpdateRenderInfo(bool UpdateSkinInfo, int ClientI
 	{
 		int LocalTeam;
 		if(g_GameClient.m_Snap.m_pLocalInfo)
-			LocalTeam = m_aClients[g_GameClient.m_LocalClientID].m_Team;
+			LocalTeam = g_GameClient.m_aClients[g_GameClient.m_LocalClientID].m_Team;
 		else // local_info null when joining a server
 			LocalTeam = 0;
 
@@ -1554,8 +1554,8 @@ void CGameClient::CClientData::UpdateRenderInfo(bool UpdateSkinInfo, int ClientI
 			if(m_Team != TEAM_SPECTATORS)
 			{
 				const char* pForcedSkin;
-				if(ClientID != g_GameClient.m_Snap.m_LocalClientID && CTeecompUtils::GetForcedSkinName(m_Team, LocalTeam, pForcedSkin))
-					Sid = max(0, g_GameClient.m_pSkins->Find(pForcedSkin));
+				if(ClientID != g_GameClient.m_LocalClientID && CTeecompUtils::GetForcedSkinPartName(m_Team, LocalTeam, pForcedSkin, p))
+					Sid = max(0, g_GameClient.m_pSkins->FindSkinPart(p, pForcedSkin));
 			}
 
 			if(CTeecompUtils::GetForceDmColors(m_Team, LocalTeam))
@@ -1566,21 +1566,17 @@ void CGameClient::CClientData::UpdateRenderInfo(bool UpdateSkinInfo, int ClientI
 			else
 			{
 				m_RenderInfo.m_aTextures[p] = g_GameClient.m_pSkins->GetSkinPart(p, Sid)->m_ColorTexture;
-				vec3 Col = CTeecompUtils::GetTeamColor(m_Team, LocalTeam, g_Config.m_TcColoredTeesTeam1,
-				g_Config.m_TcColoredTeesTeam2, g_Config.m_TcColoredTeesMethod);
-				m_RenderInfo.m_ColorBody = vec4(Col.r, Col.g, Col.b, 1.0f);
-				m_RenderInfo.m_ColorFeet = vec4(Col.r, Col.g, Col.b, 1.0f);
-				m_RenderInfo.m_aColors[p] = CTeecompUtils::GetTeamColor(m_Team, LocalTeam, g_Config.m_TcColoredTeesTeam1,
-												g_Config.m_TcColoredTeesTeam2, g_Config.m_TcColoredTeesMethod);
+				int Col = CTeecompUtils::GetTeamColorInt(m_Team, LocalTeam, g_Config.m_TcColoredTeesMethod, p);
+				m_RenderInfo.m_aColors[p] = g_GameClient.m_pSkins->GetColorV4(Col, p==SKINPART_TATTOO);
 			}
 		}
 	}
-	else if(g_Config.m_TcForceSkinTeam1 && ClientID != g_GameClient.m_Snap.m_LocalClientID) // Force DM skin
+	else if(g_Config.m_TcForceSkinTeam1 && ClientID != g_GameClient.m_LocalClientID) // Force DM skin
 	{
 		for(int p = 0; p < NUM_SKINPARTS; p++)
 		{
-			int Sid = g_GameClient.m_pSkins->FindSkinPart(p, g_Config.m_TcForcedSkin1)
-			if(m_UseCustomColor)
+			int Sid = g_GameClient.m_pSkins->FindSkinPart(p, g_Config.m_TcForcedSkin1);
+			if(m_aUseCustomColors[p])
 				m_RenderInfo.m_aTextures[p] = g_GameClient.m_pSkins->GetSkinPart(p, Sid)->m_ColorTexture;
 			else
 				m_RenderInfo.m_aTextures[p] = g_GameClient.m_pSkins->GetSkinPart(p, Sid)->m_OrgTexture;

@@ -63,7 +63,7 @@ bool CTeecompStats::IsActive()
 void CTeecompStats::CheckStatsClientID()
 {
 	if(m_StatsClientID == -1)
-		m_StatsClientID = m_pClient->m_Snap.m_LocalClientID;
+		m_StatsClientID = m_pClient->m_LocalClientID;
 
 	int Prev = m_StatsClientID;
 	while(!m_pClient->m_aStats[m_StatsClientID].m_Active)
@@ -98,7 +98,7 @@ void CTeecompStats::OnMessage(int MsgType, void *pRawMsg)
 			pStats[pMsg->m_Killer].m_CurrentSpree++;
 			
 			// play spree sound
-			if(g_Config.m_ClSpreesounds && m_pClient->m_Snap.m_LocalClientID == pMsg->m_Killer && pStats[pMsg->m_Killer].m_CurrentSpree % 5 == 0)
+			if(g_Config.m_ClSpreesounds && m_pClient->m_LocalClientID == pMsg->m_Killer && pStats[pMsg->m_Killer].m_CurrentSpree % 5 == 0)
 			{
 				int SpreeType = pStats[pMsg->m_Killer].m_CurrentSpree/5 - 1;
 				switch(SpreeType)
@@ -187,7 +187,7 @@ void CTeecompStats::OnRender()
 	// auto stat screenshot stuff
 	if(g_Config.m_TcStatScreenshot)
 	{
-		if(m_ScreenshotTime < 0 && m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER)
+		if(m_ScreenshotTime < 0 && m_pClient->m_Snap.m_pGameData && m_pClient->m_Snap.m_pGameData->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER)
 			m_ScreenshotTime = time_get()+time_freq()*3;
 		
 		if(m_ScreenshotTime > -1 && m_ScreenshotTime < time_get())
@@ -221,16 +221,16 @@ void CTeecompStats::RenderGlobalStats()
 	float w = 250.0f;
 	float h = 750.0f;
 	
-	const CNetObj_PlayerInfo *apPlayers[MAX_CLIENTS] = {0};
+	const CGameClient::CPlayerInfoItem *apPlayers[MAX_CLIENTS] = {0};
 	int NumPlayers = 0;
 	int i = 0;
 
 	// sort red or dm players by score
 	for(i = 0; i < MAX_CLIENTS; i++)
 	{
-		const CNetObj_PlayerInfo *pInfo = m_pClient->m_Snap.m_paInfoByScore[i];
+		const CGameClient::CPlayerInfoItem *pInfo = &m_pClient->m_Snap.m_aInfoByScore[i];
 
-		if(!pInfo || !m_pClient->m_aStats[pInfo->m_ClientID].m_Active || pInfo->m_Team != TEAM_RED)
+		if(!pInfo || !m_pClient->m_aStats[pInfo->m_ClientID].m_Active || m_pClient->m_aClients[pInfo->m_ClientID].m_Team != TEAM_RED)
 			continue;
 
 		apPlayers[NumPlayers] = pInfo;
@@ -238,13 +238,13 @@ void CTeecompStats::RenderGlobalStats()
 	}
 
 	// sort blue players by score after
-	if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_TEAMS)
+	if(m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS)
 	{
 		for(i = 0; i < MAX_CLIENTS; i++)
 		{
-			const CNetObj_PlayerInfo *pInfo = m_pClient->m_Snap.m_paInfoByScore[i];
+			const CGameClient::CPlayerInfoItem *pInfo = &m_pClient->m_Snap.m_aInfoByScore[i];
 
-			if(!pInfo || !m_pClient->m_aStats[pInfo->m_ClientID].m_Active || pInfo->m_Team != TEAM_BLUE)
+			if(!pInfo || !m_pClient->m_aStats[pInfo->m_ClientID].m_Active || m_pClient->m_aClients[pInfo->m_ClientID].m_Team != TEAM_BLUE)
 				continue;
 
 			apPlayers[NumPlayers] = pInfo;
@@ -261,7 +261,7 @@ void CTeecompStats::RenderGlobalStats()
 				w += 100;
 		}
 		
-	if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGCAPTURES)
+	if(m_pClient->m_Snap.m_pGameData && m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGCAPTURES)
 		w += 100;
 
 	bool aDisplayWeapon[NUM_WEAPONS] = {false};
@@ -326,7 +326,7 @@ void CTeecompStats::RenderGlobalStats()
 		px += 40;
 	}
 
-	if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGCAPTURES)
+	if(m_pClient->m_Snap.m_pGameData && m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGCAPTURES)
 	{
 		px -= 40;
 		Graphics()->TextureSet(g_pData->m_aImages[IMAGE_GAME].m_Id);
@@ -354,10 +354,10 @@ void CTeecompStats::RenderGlobalStats()
 
 	for(int j = 0; j < NumPlayers; j++)
 	{
-		const CNetObj_PlayerInfo *pInfo = apPlayers[j];
+		const CGameClient::CPlayerInfoItem *pInfo = apPlayers[j];
 		const CGameClient::CClientStats Stats = m_pClient->m_aStats[pInfo->m_ClientID];
 
-		if(pInfo->m_Local || (m_pClient->m_Snap.m_SpecInfo.m_Active && pInfo->m_ClientID == m_pClient->m_Snap.m_SpecInfo.m_SpectatorID))
+		if(m_pClient->m_LocalClientID == pInfo->m_ClientID || (m_pClient->m_Snap.m_SpecInfo.m_Active && pInfo->m_ClientID == m_pClient->m_Snap.m_SpecInfo.m_SpectatorID))
 		{
 			// background so it's easy to find the local player
 			Graphics()->TextureSet(-1);
@@ -448,7 +448,7 @@ void CTeecompStats::RenderGlobalStats()
 			TextRender()->Text(0, x-tw+px, y, FontSize, aBuf, -1);
 			px += 100;
 		}
-		if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGGRABS)
+		if(m_pClient->m_Snap.m_pGameData && m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGGRABS)
 		{
 			str_format(aBuf, sizeof(aBuf), "%d", Stats.m_FlagGrabs);
 			tw = TextRender()->TextWidth(0, FontSize, aBuf, -1);
@@ -465,7 +465,7 @@ void CTeecompStats::RenderGlobalStats()
 			TextRender()->Text(0, x+px-tw/2, y, FontSize, aBuf, -1);
 			px += 80;
 		}
-		if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGCAPTURES)
+		if(m_pClient->m_Snap.m_pGameData && m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_FLAGS && g_Config.m_TcStatboardInfos&TC_STATS_FLAGCAPTURES)
 		{
 			str_format(aBuf, sizeof(aBuf), "%d", Stats.m_FlagCaptures);
 			tw = TextRender()->TextWidth(0, FontSize, aBuf, -1);
@@ -608,7 +608,7 @@ void CTeecompStats::RenderIndividualStats()
 	}
 
 	// Flag stats
-	if(m_pClient->m_Snap.m_pGameInfoObj && m_pClient->m_Snap.m_pGameInfoObj->m_GameFlags&GAMEFLAG_FLAGS)
+	if(m_pClient->m_Snap.m_pGameData && m_pClient->m_GameInfo.m_GameFlags&GAMEFLAG_FLAGS)
 	{
 		Graphics()->BlendNormal();
 		Graphics()->TextureSet(-1);

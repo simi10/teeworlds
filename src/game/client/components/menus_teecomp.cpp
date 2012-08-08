@@ -99,7 +99,7 @@ void CMenus::RenderSettingsTeecomp(CUIRect MainView)
 
 void CMenus::RenderSettingsTeecompSkins(CUIRect MainView)
 {
-	CUIRect Button, LeftView, RightView;
+	/*CUIRect Button, LeftView, RightView;
 	MainView.VSplitLeft(MainView.w/2, &LeftView, &RightView);
 
 	LeftView.HSplitTop(20.0f, &Button, &LeftView);
@@ -277,7 +277,7 @@ void CMenus::RenderSettingsTeecompSkins(CUIRect MainView)
 		UI()->DoLabel(&Button, aBuf, 14.0f, -1);
 
 		List.HSplitTop(20.0f, &Button, &List);
-	}
+	}*/
 }
 
 void CMenus::RenderSettingsTeecompStats(CUIRect MainView)

@@ -222,7 +222,7 @@ void CServerBrowser::CServerFilter::Filter()
 			Filtered = 1;
 		else if(!(m_SortHash&FILTER_GAMETYPE_STRICT) && m_aGametype[0] && !str_find_nocase(m_pServerBrowser->m_ppServerlist[i]->m_Info.m_aGameType, m_aGametype))
 			Filtered = 1;
-		else if(m_SortHash&FILTER_TEERACE && !m_ppServerlist[i]->m_Info.m_Teerace)
+		else if(m_SortHash&FILTER_TEERACE && !m_pServerBrowser->m_ppServerlist[i]->m_Info.m_Teerace)
 			Filtered = 1;
 		else
 		{
@@ -300,7 +300,6 @@ void CServerBrowser::CServerFilter::Filter()
 int CServerBrowser::CServerFilter::SortHash() const
 {
 	int i = g_Config.m_BrSort&0xf;
-	int i = g_Config.m_BrSort&0xf;
 	i |= g_Config.m_BrSortOrder<<4;
 	if(m_SortHash&FILTER_EMPTY) i |= 1<<5;
 	if(m_SortHash&FILTER_FULL) i |= 1<<6;
@@ -314,7 +313,7 @@ int CServerBrowser::CServerFilter::SortHash() const
 	if(m_SortHash&FILTER_GAMETYPE_STRICT) i |= 1<<14;
 	if(m_SortHash&FILTER_TEERACE) i |= 1<<15;
 	if(m_SortHash&FILTER_COUNTRY) i |= 1<<16;
-	if(m_SortHash&FILTER_PING) i |= 1<<17
+	if(m_SortHash&FILTER_PING) i |= 1<<17;
 	return i;
 }
 

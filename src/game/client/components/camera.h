@@ -53,8 +53,6 @@ public:
 	static void ConKeyZoomout(IConsole::IResult *pResult, void *pUserData);
 	static void ConZoom(IConsole::IResult *pResult, void *pUserData);
 	static void ConZoomReset(IConsole::IResult *pResult, void *pUserData);
-	
-	virtual void OnConsoleInit();
 };
 
 #endif

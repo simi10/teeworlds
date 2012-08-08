@@ -53,6 +53,8 @@ void CCamera::ConZoomReset(IConsole::IResult *pResult, void *pUserData)
 
 void CCamera::OnConsoleInit()
 {
+	Console()->Register("set_position", "iii", CFGFLAG_CLIENT, ConSetPosition, this, "Sets the rotation position");
+
 	Console()->Register("+zoomin", "", CFGFLAG_CLIENT, ConKeyZoomin, this, "");
 	Console()->Register("+zoomout", "", CFGFLAG_CLIENT, ConKeyZoomout, this, "");
 	Console()->Register("zoom", "", CFGFLAG_CLIENT, ConZoom, this, "");
@@ -150,11 +152,6 @@ void CCamera::ConSetPosition(IConsole::IResult *pResult, void *pUserData)
 	// update
 	if(pSelf->GetCurrentPosition() == PositionNumber)
 		pSelf->ChangePosition(PositionNumber);
-}
-
-void CCamera::OnConsoleInit()
-{
-	Console()->Register("set_position", "iii", CFGFLAG_CLIENT, ConSetPosition, this, "Sets the rotation position");
 }
 
 void CCamera::OnStateChange(int NewState, int OldState)

@@ -169,8 +169,8 @@ void CItems::RenderFlag(const CNetObj_Flag *pPrev, const CNetObj_Flag *pCurrent,
 	float Angle = 0.0f;
 	float Size = 42.0f;
 
-	if(m_pClient->m_Snap.m_pLocalInfo && ((pCurrent->m_Team == TEAM_RED && pCurGameData && pCurGameData->m_FlagCarrierRed == m_pClient->m_Snap.m_LocalClientID) ||
-			(pCurrent->m_Team == TEAM_BLUE && pCurGameData && pCurGameData->m_FlagCarrierBlue == m_pClient->m_Snap.m_LocalClientID)) && g_Config.m_TcHideCarrying)
+	if(m_pClient->m_Snap.m_pLocalInfo && ((pCurrent->m_Team == TEAM_RED && pCurGameDataFlag && pCurGameDataFlag->m_FlagCarrierRed == m_pClient->m_LocalClientID) ||
+			(pCurrent->m_Team == TEAM_BLUE && pCurGameDataFlag && pCurGameDataFlag->m_FlagCarrierBlue == m_pClient->m_LocalClientID)) && g_Config.m_TcHideCarrying)
 		return;
 
 	Graphics()->BlendNormal();
@@ -182,8 +182,7 @@ void CItems::RenderFlag(const CNetObj_Flag *pPrev, const CNetObj_Flag *pCurrent,
 
 	if(g_Config.m_TcColoredFlags)
 	{
-		vec3 Col = CTeecompUtils::GetTeamColor(pCurrent->m_Team, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_Snap.m_pLocalInfo->m_Team : TEAM_RED,
-			g_Config.m_TcColoredTeesTeam1, g_Config.m_TcColoredTeesTeam2, g_Config.m_TcColoredTeesMethod);
+		vec3 Col = CTeecompUtils::GetTeamColor(pCurrent->m_Team, m_pClient->m_Snap.m_pLocalInfo ? m_pClient->m_aClients[m_pClient->m_LocalClientID].m_Team : TEAM_RED, g_Config.m_TcColoredTeesMethod);
 		Graphics()->SetColor(Col.r, Col.g, Col.b, 1.0f);
 	}
 
