@@ -77,7 +77,7 @@ bool CGameControllerRACE::OnRaceStart(int ID, float StartAddTime, bool Check)
 {
 	CRaceData *p = &m_aRace[ID];
 	CCharacter *pChr = GameServer()->GetPlayerChar(ID);
-	if(Check && (pChr->HasWeapon(WEAPON_GRENADE) || pChr->Armor()) && (p->m_RaceState == RACE_FINISHED || p->m_RaceState == RACE_STARTED))
+	if(Check && (pChr->HasWeapon(WEAPON_GRENADE) || pChr->HasWeapon(WEAPON_NINJA) || pChr->Armor()) && (p->m_RaceState == RACE_FINISHED || p->m_RaceState == RACE_STARTED))
 		return false;
 	
 	p->m_RaceState = RACE_STARTED;
